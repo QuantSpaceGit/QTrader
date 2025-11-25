@@ -150,7 +150,7 @@ class ReportingConfigItem(BaseModel):
         description="Report detail level: 'summary' (basic metrics), 'standard' (+ risk metrics), 'full' (+ period breakdowns)",
     )
 
-    # Note: Output directory comes from SystemConfig.output.default_results_dir
+    # Note: Output directory comes from SystemConfig.output.experiments_root
     # Not configurable per backtest - ensures consistent output structure
 
     # Benchmark (not yet implemented)

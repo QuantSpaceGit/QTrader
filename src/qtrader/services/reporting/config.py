@@ -52,7 +52,7 @@ class ReportingConfig(BaseModel):
     )
 
     # Output configuration
-    # Note: output_dir comes from SystemConfig.output.default_results_dir
+    # Note: output_dir comes from SystemConfig.output.experiments_root
     # and is passed to get_output_path() method
     write_json: bool = Field(
         default=True,

@@ -44,10 +44,8 @@ def mock_system_config(tmp_path: Path):
     output_dir = tmp_path / "output" / "backtests"
     output_dir.mkdir(parents=True, exist_ok=True)
     mock_config.output = Mock()
-    mock_config.output.default_results_dir = str(output_dir)
-    mock_config.output.use_timestamps = True
-    mock_config.output.timestamp_format = "%Y%m%d_%H%M%S"
-    mock_config.output.organize_by_date = False
+    mock_config.output.experiments_root = str(output_dir)
+    mock_config.output.run_id_format = "%Y%m%d_%H%M%S"
     mock_config.output.event_store = Mock()
     mock_config.output.event_store.backend = "parquet"
     mock_config.output.event_store.filename = "events.{backend}"
@@ -268,7 +266,7 @@ class TestBacktestEngineFromConfig:
         mock_sqlite_store.return_value = mock_event_store
 
         # Mock system config output path to use tmp_path
-        mock_system_config.output.default_results_dir = str(tmp_path / "output")
+        mock_system_config.output.experiments_root = str(tmp_path / "output")
 
         # Act
         engine = BacktestEngine.from_config(sample_backtest_config)
@@ -320,10 +318,10 @@ class TestBacktestEngineFromConfig:
     @patch("qtrader.system.log_system.LoggerFactory")
     @patch("qtrader.engine.engine.DataService")
     @patch("qtrader.engine.engine.EventBus")
-    @patch("qtrader.engine.engine.SQLiteEventStore")
+    @patch("qtrader.engine.engine.ParquetEventStore")
     def test_from_config_fallback_to_memory_store_on_error(
         self,
-        mock_sqlite_store,
+        mock_parquet_store,
         mock_event_bus_class,
         mock_data_service_class,
         mock_logger_factory,
@@ -332,14 +330,14 @@ class TestBacktestEngineFromConfig:
         mock_system_config,
         tmp_path: Path,
     ) -> None:
-        """Test from_config falls back to InMemoryEventStore on SQLite error."""
+        """Test from_config falls back to InMemoryEventStore on Parquet error."""
         # Arrange
         mock_get_system_config.return_value = mock_system_config
         mock_event_bus_class.return_value = Mock()
         mock_data_service_class.from_config.return_value = Mock()
-        mock_sqlite_store.side_effect = Exception("SQLite initialization failed")
+        mock_parquet_store.side_effect = Exception("Parquet initialization failed")
 
-        mock_system_config.output.default_results_dir = str(tmp_path / "output")
+        mock_system_config.output.experiments_root = str(tmp_path / "output")
 
         # Act
         with patch("qtrader.engine.engine.InMemoryEventStore") as mock_memory_store:
@@ -392,7 +390,7 @@ class TestBacktestEngineFromConfig:
         mock_event_bus_class.return_value = Mock()
         mock_data_service_class.from_config.return_value = Mock()
         mock_memory_store.return_value = Mock()
-        mock_system_config.output.default_results_dir = str(tmp_path / "output")
+        mock_system_config.output.experiments_root = str(tmp_path / "output")
 
         # Act
         BacktestEngine.from_config(config)

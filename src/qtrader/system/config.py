@@ -252,8 +252,8 @@ class SystemConfig:
         )
 
         output = OutputConfig(
-            experiments_root=output_dict.get("experiments_root", output_dict.get("default_results_dir", "experiments")),
-            run_id_format=output_dict.get("run_id_format", output_dict.get("timestamp_format", "%Y%m%d_%H%M%S")),
+            experiments_root=output_dict.get("experiments_root", "experiments"),
+            run_id_format=output_dict.get("run_id_format", "%Y%m%d_%H%M%S"),
             display_format=output_dict.get("display_format", "line"),
             event_store=event_store,
             capture_git_info=output_dict.get("capture_git_info", True),

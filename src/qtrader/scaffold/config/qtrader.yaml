@@ -125,10 +125,10 @@ strategy:
 # Output & Results Configuration
 # ============================================================
 output:
-  # Base directory for backtest results
-  # Structure: {default_results_dir}/{backtest_id}/{timestamp}/
-  # Example: output/backtests/buy_and_hold/20251105_121348/
-  default_results_dir: "output/backtests"
+  # Base directory for experiment results
+  # Structure: {experiments_root}/{backtest_id}/runs/{timestamp}/
+  # Example: experiments/buy_and_hold/runs/20251105_121348/
+  experiments_root: "experiments"
 
   # Event display format (used when replay_speed >= 0 in backtest config)
   # Options:
@@ -157,7 +157,7 @@ output:
     compression: "zstd" # Compression codec
 
   # Timestamp format for run subdirectories (always used)
-  timestamp_format: "%Y%m%d_%H%M%S" # Format: 20241024_142153
+  run_id_format: "%Y%m%d_%H%M%S" # Format: 20241024_142153
 
 # ============================================================
 # Logging Configuration

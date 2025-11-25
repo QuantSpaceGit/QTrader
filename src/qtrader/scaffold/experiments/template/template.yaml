@@ -223,7 +223,7 @@ reporting:
   report_detail_level: full # Detail level: "summary" | "standard" | "full"
 
 
-  # Note: Output directory comes from qtrader.yaml (output.default_results_dir)
+  # Note: Output directory comes from qtrader.yaml (output.experiments_root)
   # Ensures consistent output structure: output/backtests/{backtest_id}/{timestamp}/
 
   # Benchmark (not yet implemented)
