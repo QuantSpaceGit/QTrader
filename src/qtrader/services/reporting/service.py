@@ -728,9 +728,17 @@ class ReportingService:
 
         avg_duration = Decimal(str(sum(t.duration_days for t in trades) / len(trades))) if trades else None
 
-        # Commissions
-        total_commissions = Decimal(str(sum(t.commission for t in trades))) if trades else Decimal("0")
-        total_pnl = sum(t.pnl for t in trades)
+        # Commissions - use portfolio's total which includes ALL fills (open + closed positions)
+        # This ensures buy-and-hold and other strategies with open positions show correct commissions
+        if self._last_portfolio_state:
+            total_commissions = self._last_portfolio_state.total_commissions_paid
+        else:
+            # Fallback to summing from closed trades if no portfolio state available
+            total_commissions = Decimal(str(sum(t.commission for t in trades))) if trades else Decimal("0")
+
+        # Calculate commission % of P&L using total return (realized + unrealized)
+        # This gives a more accurate picture than just realized P&L from closed trades
+        total_pnl = final_equity - self._initial_equity  # Total P&L including unrealized
         pnl_abs = Decimal(str(abs(total_pnl)))
         commission_pct = (total_commissions / pnl_abs) * Decimal("100") if pnl_abs != Decimal("0") else Decimal("0")
 

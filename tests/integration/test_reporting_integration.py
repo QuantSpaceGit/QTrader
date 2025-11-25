@@ -241,6 +241,50 @@ class TestReportingIntegration:
         # Cleanup
         engine.shutdown()
 
+    def test_total_commissions_includes_open_positions(self, buy_hold_backtest_config, mock_system_config):
+        """Test that total_commissions includes commissions from open positions.
+
+        Buy-and-hold strategy opens a position but never closes it.
+        The commission from the entry fill should still be reported in total_commissions.
+
+        Regression test for bug where total_commissions only summed from closed trades,
+        showing $0.00 for strategies with only open positions.
+        """
+        config = buy_hold_backtest_config
+
+        with patch("qtrader.engine.engine.get_system_config", return_value=mock_system_config):
+            engine = BacktestEngine.from_config(config)
+            result = engine.run()
+
+        assert result.bars_processed > 0
+
+        # Find output directory
+        output_base = Path(mock_system_config.output.experiments_root) / config.sanitized_backtest_id
+        runs_dir = output_base / "runs"
+        timestamped_dirs = list(runs_dir.iterdir())
+        latest_dir = max(timestamped_dirs, key=lambda p: p.name)
+
+        # Load performance.json
+        perf_json = latest_dir / "performance.json"
+        with open(perf_json) as f:
+            metrics = json.load(f)
+
+        # Buy-and-hold with default commission ($0.005/share, $1.00 min) should have non-zero commission
+        # The strategy buys ~$100k of AAPL at ~$100-500/share = ~200-1000 shares
+        # Commission = max(shares * $0.005, $1.00) > $1.00
+        total_commissions = float(metrics["total_commissions"])
+        assert total_commissions > 0, (
+            f"total_commissions should be > 0 for buy-and-hold with open position, got {total_commissions}"
+        )
+
+        # Verify no closed trades (position is still open)
+        total_trades = int(metrics["total_trades"])
+        assert total_trades == 0, f"Buy-and-hold should have 0 closed trades, got {total_trades}"
+
+        # The fact that total_commissions > 0 while total_trades == 0 proves
+        # we're correctly including commissions from open positions
+        engine.shutdown()
+
     def test_reporting_handles_large_backtest(self, buy_hold_backtest_config, mock_system_config):
         """Test that reporting correctly samples equity curve for large backtests.
 
