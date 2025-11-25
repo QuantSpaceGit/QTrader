@@ -18,6 +18,7 @@ from qtrader.cli.ui import (
 )
 from qtrader.cli.ui.formatters import add_bar_data, add_cache_info_row, add_update_result_row
 from qtrader.services.data.adapters.resolver import DataSourceResolver
+from qtrader.services.data.models import Instrument
 from qtrader.services.data.update_service import UpdateService
 from qtrader.utilities.yahoo_update import (
     BATCH_PAUSE,
@@ -165,8 +166,6 @@ def raw_data(symbol: str, start_date: str, end_date: str, dataset: str):
         # Load data directly from adapter
         console.print(f"[cyan]Loading data for {symbol} from {dataset}...[/cyan]")
 
-        from qtrader.services.data.models import Instrument
-
         resolver = DataSourceResolver()
         instrument = Instrument(symbol=symbol)
         adapter = resolver.resolve_by_dataset(dataset, instrument)
@@ -180,7 +179,7 @@ def raw_data(symbol: str, start_date: str, end_date: str, dataset: str):
             sys.exit(0)
 
         console.print(f"[green]Loaded {len(bars)} bars[/green]")
-        console.print("[dim]Displaying raw unadjusted prices[/dim]")
+        console.print("[dim]Displaying data as come from the source[/dim]")
         console.print("[dim]Press ENTER to view next bar, CTRL+C to exit[/dim]\n")
 
         # Display bars one by one
