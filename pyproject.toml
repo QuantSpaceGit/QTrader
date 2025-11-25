@@ -95,6 +95,7 @@ packages = ["src/qtrader"]
 [tool.hatchling.build.targets.wheel.force-include]
 "src/qtrader/scaffold" = "qtrader/scaffold"
 "src/qtrader/templates" = "qtrader/templates"
+"src/qtrader/services/data" = "qtrader/services/data"
 
 [tool.uv]
 package = true # Enable package installation for entry points
