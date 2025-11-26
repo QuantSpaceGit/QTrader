@@ -165,10 +165,34 @@ ______________________________________________________________________
 
 ## 3. User Guide (Getting Started)
 
-### Install
+### Installation
+
+QTrader requires Python 3.13+. We recommend using [uv](https://docs.astral.sh/uv/) for fast, reliable package management.
+
+#### Using uv (Recommended)
 
 ```bash
-pip install qtrader
+# Install latest version from GitHub
+uv add git+https://github.com/QuantSpaceGit/QTrader.git
+
+# Or install a specific release
+uv add git+https://github.com/QuantSpaceGit/QTrader.git@v0.2.0-beta.3
+```
+
+#### Using pip
+
+```bash
+# Install latest version from GitHub
+pip install git+https://github.com/QuantSpaceGit/QTrader.git
+
+# Or install a specific release
+pip install git+https://github.com/QuantSpaceGit/QTrader.git@v0.2.0-beta.3
+```
+
+#### Verify Installation
+
+```bash
+qtrader --help
 ```
 
 ### Initialize a New Project
