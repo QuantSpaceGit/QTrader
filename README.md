@@ -192,14 +192,14 @@ pip install git+https://github.com/QuantSpaceGit/QTrader.git@v0.2.0-beta.3
 #### Verify Installation
 
 ```bash
-qtrader --help
+qtrader --version
 ```
 
 ### Initialize a New Project
 
 ```bash
-qtrader init-project my-trading-system
-cd my-trading-system
+qtrader init-project <PATH>
+cd <PATH>
 ```
 
 and you get:

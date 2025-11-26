@@ -1,5 +1,7 @@
 # QTrader Project
 
+> Congratulations! If you are here it means you have already installed QTrader as a package in your environment and have run the `qtrader init-project <PATH>` command to scaffold a new backtesting project.
+
 Welcome to your QTrader backtesting environment! This project was initialized with `qtrader init-project` and includes everything you need to start running backtests.
 
 ## 📁 Project Structure
@@ -55,14 +57,7 @@ Welcome to your QTrader backtesting environment! This project was initialized wi
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
-
-```bash
-# If you haven't already
-pip install qtrader
-```
-
-### 2. Get Data
+### 1. Get Data
 
 **Option A: Use Sample Data (Limited)**
 
@@ -114,7 +109,7 @@ Date,Open,High,Low,Close,Adj Close,Volume
 2020-01-02,74.06,75.15,73.80,75.09,74.35,135480400
 ```
 
-### 3. Review Experiment Configuration
+### 2. Review Experiment Configuration
 
 Before running backtests, review the experiment configuration files to understand what will be tested:
 
@@ -137,7 +132,7 @@ Key configuration sections to review:
 
 Make sure the symbols in your experiment configuration match the data you downloaded in step 2.
 
-### 4. Run Example Experiments
+### 3. Run Example Experiments
 
 ```bash
 # Run buy and hold experiment
@@ -147,7 +142,7 @@ qtrader backtest experiments/buy_hold
 qtrader backtest experiments/sma_crossover
 ```
 
-### 5. View Results
+### 4. View Results
 
 Each experiment run creates an isolated directory with full provenance:
 
