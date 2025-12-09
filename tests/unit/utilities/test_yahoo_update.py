@@ -349,6 +349,43 @@ class TestDataFetching:
         assert dividends.iloc[0] == 0.82
 
     @patch("qtrader.utilities.yahoo_update.yf.Ticker")
+    @patch("qtrader.utilities.yahoo_update.datetime")
+    def test_fetch_yahoo_data_filters_intraday_when_market_open(self, mock_datetime: Mock, mock_ticker_class: Mock):
+        """Test that intraday data is filtered out when market is still open."""
+        # Arrange: Mock time to 2 PM ET (market open)
+        mock_now = datetime(2024, 12, 9, 14, 0, 0, tzinfo=ZoneInfo("America/New_York"))
+        mock_datetime.now.return_value = mock_now
+
+        mock_ticker = Mock()
+        mock_ticker_class.return_value = mock_ticker
+
+        # yfinance returns data including today (Dec 9) despite end_date parameter
+        hist_df = pd.DataFrame(
+            {
+                "Open": [280.0, 278.0, 279.0],
+                "High": [281.0, 279.0, 280.0],
+                "Low": [279.0, 277.0, 278.0],
+                "Close": [280.5, 278.5, 279.5],
+                "Adj Close": [280.0, 278.0, 279.0],
+                "Volume": [40000000, 42000000, 31779],  # Last row has incomplete volume
+                "Dividends": [0.0, 0.0, 0.0],
+            },
+            index=pd.to_datetime(["2024-12-05", "2024-12-06", "2024-12-09"]),  # Includes today
+        )
+        mock_ticker.history.return_value = hist_df
+
+        # Act
+        price_data, dividends = fetch_yahoo_data("AAPL")
+
+        # Assert: Should filter out Dec 9 (today) since market is open
+        assert price_data is not None
+        assert len(price_data) == 2  # Should only have Dec 5 and Dec 6
+        dates = price_data.index.strftime("%Y-%m-%d").tolist()
+        assert "2024-12-09" not in dates
+        assert "2024-12-05" in dates
+        assert "2024-12-06" in dates
+
+    @patch("qtrader.utilities.yahoo_update.yf.Ticker")
     @patch("qtrader.utilities.yahoo_update.time.sleep")
     def test_fetch_yahoo_data_retry_on_rate_limit(self, mock_sleep: Mock, mock_ticker_class: Mock):
         """Test retry logic on rate limit error."""
@@ -500,6 +537,40 @@ class TestDataMerging:
         assert result is False  # No new data added
         df = pd.read_csv(csv_path)
         assert len(df) == 3  # Original count unchanged
+
+    @patch("qtrader.utilities.yahoo_update.datetime")
+    def test_merge_data_filters_future_dates_when_market_open(self, mock_datetime: Mock, temp_data_dir: Path):
+        """Test that merge_data filters out dates beyond safe_end_date."""
+        # Arrange: Mock time to 2 PM ET on Dec 9 (market open)
+        mock_now = datetime(2024, 12, 9, 14, 0, 0, tzinfo=ZoneInfo("America/New_York"))
+        mock_datetime.now.return_value = mock_now
+
+        csv_path = temp_data_dir / "AAPL.csv"
+
+        # New data includes today (Dec 9) which should be filtered
+        new_data = pd.DataFrame(
+            {
+                "Open": [280.0, 278.0, 279.0],
+                "High": [281.0, 279.0, 280.0],
+                "Low": [279.0, 277.0, 278.0],
+                "Close": [280.5, 278.5, 279.5],
+                "Adj Close": [280.0, 278.0, 279.0],
+                "Volume": [40000000, 42000000, 31779],  # Last has incomplete volume
+            },
+            index=pd.to_datetime(["2024-12-05", "2024-12-06", "2024-12-09"]),
+        )
+        new_data.index.name = "Date"
+
+        # Act
+        result = merge_data(csv_path, new_data, full_refresh=False)
+
+        # Assert
+        assert result is True
+        df = pd.read_csv(csv_path)
+        assert len(df) == 2  # Should only have Dec 5 and Dec 6, not Dec 9
+        assert "2024-12-09" not in df["Date"].values
+        assert "2024-12-05" in df["Date"].values
+        assert "2024-12-06" in df["Date"].values
 
     def test_merge_data_none_dataframe(self, temp_data_dir: Path):
         """Test merge with None DataFrame returns False."""
