@@ -58,7 +58,7 @@ help: ## 📚 Show this help message
 	@grep -E '^(test[a-zA-Z_-]*|qa):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(BOLD)📦 Build & Release:$(END)"
-	@grep -E '^(build|release-check):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
+	@grep -E '^(build|release-check|version|release-prepare|release):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(BOLD)📓 Development Tools:$(END)"
 	@grep -E '^(setup-kernel|run-jupyter):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
@@ -67,9 +67,14 @@ help: ## 📚 Show this help message
 	@grep -E '^(help):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(END) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(YELLOW)💡 Quick Start:$(END)"
-	@echo "  $(CYAN)make setup$(END)     - Complete development environment setup"
-	@echo "  $(CYAN)make qa$(END)        - Run full quality assurance (format + lint + test)"
-	@echo "  $(CYAN)make test$(END)      - Run all tests with coverage"
+	@echo "  $(CYAN)make setup$(END)          - Complete development environment setup"
+	@echo "  $(CYAN)make qa$(END)             - Run full quality assurance (format + lint + test)"
+	@echo "  $(CYAN)make test$(END)           - Run all tests with coverage"
+	@echo ""
+	@echo "$(YELLOW)🚀 Release Workflow:$(END)"
+	@echo "  $(CYAN)make version$(END)        - Show current version"
+	@echo "  $(CYAN)make release-prepare$(END) - Check if ready for release (runs QA)"
+	@echo "  $(CYAN)make release VERSION=x.y.z$(END) - Create and push GitHub release tag"
 	@echo ""
 
 
@@ -217,11 +222,89 @@ build: clean qa ## 📦 Build package (clean + qa + uv build)
 	@echo "$(CYAN)📦 Distribution files:$(END)"
 	@ls -lh dist/
 
-.PHONY: release-check
-release-check: build ## 🔍 Verify package can be installed locally
-	@echo "$(BLUE)ℹ️  Testing package installation...$(END)"
-	@python -m pip install --force-reinstall dist/*.whl
-	@echo "$(GREEN)✅ Package installs successfully$(END)"
+.PHONY: version
+version: ## 📋 Show current version from pyproject.toml
+	@grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/'
+
+.PHONY: release-prepare
+release-prepare: qa ## 🚀 Prepare release (run QA, show version, prompt for confirmation)
+	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(END)"
+	@echo "$(BOLD)📦 Release Preparation$(END)"
+	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(END)"
+	@echo ""
+	@echo "$(BLUE)Current version:$(END) $$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')"
+	@echo ""
+	@echo "$(YELLOW)⚠️  Before releasing:$(END)"
+	@echo "  1. Update version in pyproject.toml if needed"
+	@echo "  2. Update CHANGELOG.md with release notes"
+	@echo "  3. Commit all changes: $(CYAN)git add -A && git commit -m 'chore: prepare release vX.Y.Z'$(END)"
+	@echo "  4. Run: $(CYAN)make release VERSION=X.Y.Z$(END)"
+	@echo ""
+	@echo "$(GREEN)✅ QA checks passed - ready for release$(END)"
+
+.PHONY: release
+release: ## 🚀 Create GitHub release (usage: make release VERSION=x.y.z)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "$(RED)❌ VERSION not specified$(END)"; \
+		echo "$(YELLOW)Usage: make release VERSION=x.y.z$(END)"; \
+		echo "$(YELLOW)Example: make release VERSION=0.2.0$(END)"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(END)"
+	@echo "$(BOLD)🚀 Creating GitHub Release v$(VERSION)$(END)"
+	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(END)"
+	@echo ""
+	@CURRENT_VERSION=$$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/'); \
+	if [ "$$CURRENT_VERSION" != "$(VERSION)" ]; then \
+		echo "$(RED)❌ Version mismatch!$(END)"; \
+		echo "$(YELLOW)pyproject.toml has: $$CURRENT_VERSION$(END)"; \
+		echo "$(YELLOW)You specified: $(VERSION)$(END)"; \
+		echo "$(YELLOW)Update pyproject.toml first or use VERSION=$$CURRENT_VERSION$(END)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)ℹ️  Checking git status...$(END)"
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "$(RED)❌ Working directory is not clean$(END)"; \
+		echo "$(YELLOW)Commit or stash changes before releasing$(END)"; \
+		git status --short; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✅ Working directory is clean$(END)"
+	@echo ""
+	@echo "$(BLUE)ℹ️  Checking if tag v$(VERSION) already exists...$(END)"
+	@if git rev-parse "v$(VERSION)" >/dev/null 2>&1; then \
+		echo "$(RED)❌ Tag v$(VERSION) already exists$(END)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✅ Tag is available$(END)"
+	@echo ""
+	@echo "$(BLUE)ℹ️  Building release artifacts...$(END)"
+	@$(MAKE) build
+	@echo ""
+	@echo "$(BLUE)ℹ️  Creating git tag v$(VERSION)...$(END)"
+	@git tag -a "v$(VERSION)" -m "Release version $(VERSION)"
+	@echo "$(GREEN)✅ Tag created$(END)"
+	@echo ""
+	@echo "$(BLUE)ℹ️  Pushing tag to GitHub...$(END)"
+	@git push origin "v$(VERSION)"
+	@echo "$(GREEN)✅ Tag pushed to GitHub$(END)"
+	@echo ""
+	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(END)"
+	@echo "$(GREEN)✅ Release v$(VERSION) created successfully!$(END)"
+	@echo "$(CYAN)════════════════════════════════════════════════════════════════$(END)"
+	@echo ""
+	@echo "$(YELLOW)📋 Next steps:$(END)"
+	@echo "  1. Go to: https://github.com/QuantSpaceGit/QTrader/releases/new?tag=v$(VERSION)"
+	@echo "  2. GitHub will auto-detect the tag"
+	@echo "  3. Add release notes from CHANGELOG.md"
+	@echo "  4. Attach files from dist/ directory:"
+	@echo "     - dist/qtrader-$(VERSION)-py3-none-any.whl"
+	@echo "     - dist/qtrader-$(VERSION).tar.gz"
+	@echo "  5. Click 'Publish release'"
+	@echo ""
+	@echo "$(BLUE)💡 Or use GitHub CLI if installed:$(END)"
+	@echo "  $(CYAN)gh release create v$(VERSION) dist/* --title 'Release v$(VERSION)' --notes-file CHANGELOG.md$(END)"
+	@echo ""
 
 
 ################################################################################
