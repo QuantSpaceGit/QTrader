@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning (pre-release identifiers included).
 
-## [0.2.0-beta.3] - 2025-12-09
+## [0.2.0-beta.4] - 2025-12-09
 
 ### Fixed
 
