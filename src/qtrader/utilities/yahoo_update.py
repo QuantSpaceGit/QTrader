@@ -197,6 +197,15 @@ def fetch_yahoo_data(
         if hist.empty:
             return None, None
 
+        # CRITICAL FIX: yfinance sometimes returns intraday data even when end_date is set
+        # Filter out any rows with dates after safe_end_date to prevent incomplete data
+        safe_end = get_safe_end_date()
+        hist.index = hist.index.tz_localize(None)  # Remove timezone for comparison
+        hist = hist[hist.index.strftime("%Y-%m-%d") <= safe_end]
+
+        if hist.empty:
+            return None, None
+
         # Extract dividends (comes as part of history with actions=True)
         dividends = hist["Dividends"]
         dividends = dividends[dividends > 0]  # Filter out zero dividends
@@ -260,6 +269,14 @@ def merge_data(existing_path: Path, new_data: Any, full_refresh: bool = False) -
 
         # Format Date column to YYYY-MM-DD
         new_data["Date"] = new_data["Date"].dt.strftime("%Y-%m-%d")
+
+        # CRITICAL FIX: Double-check we don't write data beyond safe end date
+        # This provides a second layer of protection against incomplete intraday data
+        safe_end = get_safe_end_date()
+        new_data = new_data[new_data["Date"] <= safe_end]
+
+        if new_data.empty:
+            return False
 
         # Ensure correct column order
         columns = ["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume"]
