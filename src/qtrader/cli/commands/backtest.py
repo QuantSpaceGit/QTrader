@@ -9,6 +9,7 @@ from typing import Optional
 import click
 from rich.console import Console
 
+from qtrader.cli.ui.interactive import InteractiveDebugger
 from qtrader.engine.config import load_backtest_config
 from qtrader.engine.engine import BacktestEngine
 from qtrader.engine.experiment import ExperimentMetadata, ExperimentResolver, RunMetadata
@@ -64,6 +65,23 @@ console = Console()
     default=True,
     help="Generate interactive HTML report (default: enabled)",
 )
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Interactive mode: pause at each timestamp for debugging",
+)
+@click.option(
+    "--break-at",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Start interactive mode from specific date (YYYY-MM-DD)",
+)
+@click.option(
+    "--inspect",
+    type=click.Choice(["bars", "full", "strategy"], case_sensitive=False),
+    default="bars",
+    help="Inspection level in interactive mode (bars=basic, full=everything, strategy=indicators only)",
+)
 def backtest_command(
     config_path: Path,
     config_file_deprecated: Optional[Path],
@@ -73,6 +91,9 @@ def backtest_command(
     end_date: Optional[datetime],
     log_level: Optional[str],
     html_report: bool,
+    interactive: bool,
+    break_at: Optional[datetime],
+    inspect: str,
 ):
     """
     Run a backtest from experiment directory or configuration file.
@@ -107,6 +128,13 @@ def backtest_command(
 
         # Debug mode (show all initialization logs)
         qtrader backtest experiments/momentum_strategy -l debug
+
+        # Interactive debugging (pause at each timestamp)
+        qtrader backtest experiments/momentum_strategy --interactive
+
+        # Interactive from specific date with full inspection
+        qtrader backtest experiments/momentum_strategy --interactive \\
+            --break-at 2020-06-15 --inspect full
 
     \b
     Output Structure:
@@ -209,6 +237,20 @@ def backtest_command(
         if config.reporting:
             config.reporting.write_html_report = html_report
 
+        # Initialize interactive debugger if requested
+        debugger = None
+        if interactive:
+            debugger = InteractiveDebugger(
+                break_at=break_at.date() if break_at else None,
+                inspect_level=inspect.lower(),
+                enabled=True,
+            )
+            console.print("[cyan]Interactive Mode:[/cyan] [yellow]Enabled[/yellow]")
+            if break_at:
+                console.print(f"  Break at: [yellow]{break_at.date()}[/yellow]")
+            console.print(f"  Inspect level: [yellow]{inspect}[/yellow]")
+            console.print()
+
         # Display config summary
         console.print(f"  Backtest ID: [yellow]{config.backtest_id}[/yellow]")
         console.print(
@@ -226,7 +268,7 @@ def backtest_command(
 
         # Initialize engine with run directory for artifact output
         with console.status("[cyan]Initializing backtest engine...[/cyan]"):
-            engine = BacktestEngine.from_config(config, results_dir=run_dir)
+            engine = BacktestEngine.from_config(config, results_dir=run_dir, debugger=debugger)
 
         # Run backtest
         try:
