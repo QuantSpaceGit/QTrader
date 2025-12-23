@@ -263,6 +263,36 @@ qtrader backtest --help
 
 Artifacts: `experiments/{backtest_id}/runs` (metrics, equity curve, trades, config snapshot).
 
+### Interactive Debugging
+
+QTrader includes an interactive debugger for step-through strategy development:
+
+```bash
+# Pause at each timestamp to inspect state
+qtrader backtest experiments/sma_crossover --interactive
+
+# Start debugging from a specific date
+qtrader backtest experiments/sma_crossover --interactive --break-at 2020-06-15
+
+# Control detail level (bars, full, strategy)
+qtrader backtest experiments/sma_crossover --interactive --inspect full
+```
+
+**Interactive Commands:**
+
+- `Enter` - Step to next timestamp
+- `c` - Continue without pausing
+- `q` - Quit backtest
+- `i` - Toggle inspection level
+
+**Display Features:**
+
+- Unified table showing OHLCV bars with indicators as columns
+- Real-time strategy state at each timestamp
+- Clean console output with Rich formatting
+
+For detailed usage guide, see [docs/cli/interactive_debugging.md](docs/cli/interactive_debugging.md).
+
 ### Programmatic API
 
 ```python
@@ -295,6 +325,8 @@ ______________________________________________________________________
 
 ## 4. CLI Reference (Essentials)
 
+### Core Commands
+
 | Command                                                      | Purpose                                      |
 | ------------------------------------------------------------ | -------------------------------------------- |
 | `qtrader init-project <path>`                                | Scaffold a new backtesting project           |
@@ -303,7 +335,26 @@ ______________________________________________________________________
 | `qtrader data list`                                          | List configured data adapters/sources        |
 | `qtrader init-library <path> [--type ...]`                   | Generate template code for custom components |
 
-Extended docs: `docs/packages/cli/backtest.md`.
+### Interactive Debugging Options
+
+| Flag                   | Purpose                                         |
+| ---------------------- | ----------------------------------------------- |
+| `--interactive` / `-i` | Enable step-through debugging mode              |
+| `--break-at DATE`      | Start pausing from specific date (YYYY-MM-DD)   |
+| `--inspect LEVEL`      | Set detail level: `bars`, `full`, or `strategy` |
+
+**Example:**
+
+```bash
+qtrader backtest experiments/sma_crossover --interactive --break-at 2020-06-15 --inspect full
+```
+
+### Documentation References
+
+- **Backtest Command**: [docs/packages/cli/backtest.md](docs/packages/cli/backtest.md)
+- **Interactive Debugging**: [docs/cli/interactive_debugging.md](docs/cli/interactive_debugging.md)
+- **Strategy Development**: [docs/packages/strategy.md](docs/packages/strategy.md)
+- **Indicators**: [docs/packages/indicators/indicators.md](docs/packages/indicators/indicators.md)
 
 ______________________________________________________________________
 

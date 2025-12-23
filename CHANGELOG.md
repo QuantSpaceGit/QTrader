@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning (pre-release identifiers included).
 
+## [Unreleased]
+
+### Added
+
+- **Interactive Debugging**: Step-through debugging for backtest development
+  - New `--interactive` / `-i` flag to pause execution at each timestamp
+  - New `--break-at DATE` option to start debugging from specific date (YYYY-MM-DD format)
+  - New `--inspect LEVEL` option to control detail level (`bars`, `full`, or `strategy`)
+  - Rich console UI with unified table displaying OHLCV bars and indicators together
+  - Automatic indicator collection from strategy service contexts
+  - Interactive commands: `Enter` (step), `c` (continue), `q` (quit), `i` (toggle inspect)
+  - Clean timestamp header display before event logs for better readability
+  - Implementation:
+    - Created `InteractiveDebugger` class in `src/qtrader/cli/ui/interactive.py`
+    - Integrated debugger into engine pipeline (Engine → DataService → timestamp pause points)
+    - Added 51 unit tests with 97% code coverage in `tests/unit/cli/ui/test_interactive.py`
+    - Zero overhead when debugger is disabled
+  - See [docs/cli/interactive_debugging.md](docs/cli/interactive_debugging.md) for complete usage guide
+  - Updated [README.md](README.md) with interactive debugging overview and CLI reference
+
 ## [0.2.0-beta.4] - 2025-12-09
 
 ### Fixed
