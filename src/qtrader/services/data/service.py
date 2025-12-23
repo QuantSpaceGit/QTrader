@@ -387,6 +387,7 @@ class DataService:
         is_warmup: bool = False,
         strict: bool = False,
         replay_speed: float = 0.0,
+        debugger: Any | None = None,
     ) -> None:
         """
         Load bars for multiple symbols and publish PriceBarEvent for each bar.
@@ -407,6 +408,8 @@ class DataService:
             replay_speed: Seconds to sleep after publishing bars for each timestamp (0.0 = no delay).
                          Used for visualization/debugging to slow down playback.
                          Does not affect system logic, only timing of event publication.
+            debugger: Optional interactive debugger for step-through execution at each timestamp.
+                      If provided, will pause after publishing bars and display state.
 
         Raises:
             ValueError: If EventBus not configured
@@ -516,6 +519,10 @@ class DataService:
 
             # If we've moved to a new timestamp, publish all bars from previous timestamp
             if current_timestamp is not None and ts != current_timestamp:
+                # Show debugger header BEFORE publishing events (if enabled)
+                if debugger is not None and debugger.should_pause(current_timestamp):
+                    debugger.show_header(current_timestamp)
+
                 # Publish all bars at current_timestamp in sorted symbol order
                 for sym in sorted(bars_at_current_ts.keys()):
                     bar_data, prev_data = bars_at_current_ts[sym]
@@ -537,6 +544,27 @@ class DataService:
                 if replay_speed > 0:
                     time.sleep(replay_speed)
 
+                # Interactive debugger display and wait (if enabled)
+                if debugger is not None and debugger.should_pause(current_timestamp):
+                    # Convert bars to dict format for display
+                    bars_dict = {}
+                    for sym in bars_at_current_ts.keys():
+                        bar_data, _ = bars_at_current_ts[sym]
+                        adapter = adapters[sym]
+                        # Convert raw bar to PriceBarEvent for consistent display
+                        price_event = adapter.to_price_bar_event(bar_data)
+                        bars_dict[sym] = price_event
+
+                    # TODO: Collect indicators, signals, portfolio state from services
+                    # For now, pass empty dicts - will enhance in future iterations
+                    debugger.on_timestamp(
+                        timestamp=current_timestamp,
+                        bars=bars_dict,
+                        indicators={},
+                        signals=[],
+                        portfolio=None,
+                    )
+
                 unique_timestamps += 1
                 bars_at_current_ts = {}
 
@@ -555,6 +583,10 @@ class DataService:
 
         # Publish remaining bars from last timestamp
         if bars_at_current_ts and current_timestamp is not None:
+            # Show debugger header BEFORE publishing final events (if enabled)
+            if debugger is not None and debugger.should_pause(current_timestamp):
+                debugger.show_header(current_timestamp)
+
             for sym in sorted(bars_at_current_ts.keys()):
                 bar_data, prev_data = bars_at_current_ts[sym]
 
@@ -574,6 +606,27 @@ class DataService:
             # Sleep for visualization (if replay_speed > 0) after publishing final timestamp
             if replay_speed > 0:
                 time.sleep(replay_speed)
+
+            # Interactive debugger display and wait for final timestamp (if enabled)
+            if debugger is not None and debugger.should_pause(current_timestamp):
+                # Convert bars to dict format for display
+                bars_dict = {}
+                for sym in bars_at_current_ts.keys():
+                    bar_data, _ = bars_at_current_ts[sym]
+                    adapter = adapters[sym]
+                    # Convert raw bar to PriceBarEvent for consistent display
+                    price_event = adapter.to_price_bar_event(bar_data)
+                    bars_dict[sym] = price_event
+
+                # TODO: Collect indicators, signals, portfolio state from services
+                # For now, pass empty dicts - will enhance in future iterations
+                debugger.on_timestamp(
+                    timestamp=current_timestamp,
+                    bars=bars_dict,
+                    indicators={},
+                    signals=[],
+                    portfolio=None,
+                )
 
             unique_timestamps += 1
 

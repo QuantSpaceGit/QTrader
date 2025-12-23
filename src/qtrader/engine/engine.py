@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from rich.console import Console
@@ -125,6 +125,7 @@ class BacktestEngine:
         reporting_service: ReportingService | None = None,
         event_store: EventStore | None = None,
         results_dir: Path | None = None,
+        debugger: Any | None = None,
     ) -> None:
         """
         Initialize backtest engine.
@@ -140,6 +141,7 @@ class BacktestEngine:
             reporting_service: Optional reporting service for performance metrics
             event_store: Optional persistence backend
             results_dir: Optional directory for run artifacts
+            debugger: Optional interactive debugger for step-through execution
         """
         self.config = config
         self._event_bus = event_bus
@@ -151,6 +153,7 @@ class BacktestEngine:
         self._reporting_service = reporting_service
         self._event_store = event_store
         self._results_dir = results_dir
+        self._debugger = debugger
         self._bar_count = 0  # Initialize for tracking bars processed
 
         # Get all symbols from data sources
@@ -172,7 +175,9 @@ class BacktestEngine:
         )
 
     @classmethod
-    def from_config(cls, config: BacktestConfig, results_dir: Path | None = None) -> "BacktestEngine":
+    def from_config(
+        cls, config: BacktestConfig, results_dir: Path | None = None, debugger: Any | None = None
+    ) -> "BacktestEngine":
         """
         Factory method to create engine from configuration.
 
@@ -182,6 +187,7 @@ class BacktestEngine:
         Args:
             config: Backtest configuration loaded from YAML
             results_dir: Optional directory for run artifacts (experiment run directory)
+            debugger: Optional interactive debugger for step-through execution
 
         Returns:
             Configured BacktestEngine instance
@@ -546,6 +552,7 @@ class BacktestEngine:
             reporting_service=reporting_service,
             event_store=event_store,
             results_dir=results_dir,
+            debugger=debugger,
         )
 
     def shutdown(self) -> None:
@@ -729,6 +736,10 @@ class BacktestEngine:
             # Current approach works well for typical use cases (10-500 symbols).
             # Heap-merge would stream bars incrementally instead of buffering all in memory.
             try:
+                # Give debugger access to strategy service for collecting indicators
+                if self._debugger is not None and self._strategy_service is not None:
+                    self._debugger.set_strategy_service(self._strategy_service)
+
                 self._data_service.stream_universe(
                     symbols=list(source_symbols),
                     start_date=self.config.start_date,
@@ -736,6 +747,7 @@ class BacktestEngine:
                     is_warmup=False,
                     strict=False,  # Continue if some symbols fail to load
                     replay_speed=self.config.replay_speed,  # Use replay_speed from config
+                    debugger=self._debugger,  # Pass debugger for interactive stepping
                 )
             except Exception as e:
                 logger.error(
