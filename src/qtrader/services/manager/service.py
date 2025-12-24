@@ -84,6 +84,11 @@ class ManagerService:
         self._cached_positions: list[risk_limits.Position] = []  # Flattened for risk checks
         self._cached_strategy_positions: dict[str, dict[str, int]] = {}  # {strategy_id: {symbol: quantity}}
 
+        # Pending close signals tracker: {(strategy_id, symbol): intention}
+        # Prevents duplicate CLOSE signals while waiting for fill confirmation
+        # Cleared when position goes to 0 (via PortfolioStateEvent)
+        self._pending_closes: dict[tuple[str, str], str] = {}
+
         # Subscribe to events
         self._event_bus.subscribe("signal", self.on_signal)  # type: ignore[arg-type]
         self._event_bus.subscribe("portfolio_state", self.on_portfolio_state)  # type: ignore[arg-type]
@@ -307,6 +312,25 @@ class ManagerService:
         quantity: int = 0
 
         if event.intention in ("CLOSE_LONG", "CLOSE_SHORT"):
+            # Check for duplicate FULL close signal (confidence=1.0, already pending)
+            # Partial closes (confidence < 1.0) are allowed to accumulate
+            pending_key = (event.strategy_id, event.symbol)
+            if pending_key in self._pending_closes and event.confidence >= Decimal("1.0"):
+                # Duplicate full close signal - reject silently (common strategy mistake)
+                # This prevents: signal1 → CLOSE_LONG, signal2 → CLOSE_LONG (same bar)
+                # Without fill in between, second CLOSE would open a short position
+                self._logger.debug(
+                    "manager.signal.rejected.duplicate_close",
+                    extra={
+                        "signal_id": event.signal_id,
+                        "strategy_id": event.strategy_id,
+                        "symbol": event.symbol,
+                        "intention": event.intention,
+                        "pending_intention": self._pending_closes[pending_key],
+                    },
+                )
+                return
+
             # Get current position for this strategy-symbol pair
             current_quantity = self._get_position_quantity(event.strategy_id, event.symbol)
 
@@ -594,6 +618,12 @@ class ManagerService:
 
         self._event_bus.publish(order_event)
 
+        # Track pending FULL close signals to prevent duplicates
+        # Only track full closes (confidence=1.0) - partial closes can accumulate
+        if event.intention in ("CLOSE_LONG", "CLOSE_SHORT") and event.confidence >= Decimal("1.0"):
+            pending_key = (event.strategy_id, event.symbol)
+            self._pending_closes[pending_key] = event.intention
+
         self._logger.info(
             "Order emitted",
             extra={
@@ -678,6 +708,11 @@ class ManagerService:
 
                     # Add to strategy-grouped map for close signal lookup
                     strategy_positions_map[strategy_id][portfolio_pos.symbol] = portfolio_pos.open_quantity
+                else:
+                    # Position is flat/closed - clear any pending close signal
+                    pending_key = (strategy_id, portfolio_pos.symbol)
+                    if pending_key in self._pending_closes:
+                        del self._pending_closes[pending_key]
 
         self._cached_positions = converted_positions
         self._cached_strategy_positions = strategy_positions_map
