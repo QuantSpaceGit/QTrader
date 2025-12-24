@@ -872,8 +872,8 @@ class PortfolioService:
         for key, position in positions_to_split:
             strategy_id, _ = key
 
-            # Adjust all lots
-            for lot in position.lots:
+            # Adjust all lots - iterate over a COPY to avoid modifying list during iteration
+            for lot in list(position.lots):
                 # Adjust quantity: multiply by ratio
                 new_quantity = lot.quantity * ratio
                 # Adjust entry price: divide by ratio
