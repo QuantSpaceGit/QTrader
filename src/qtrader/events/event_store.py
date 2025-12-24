@@ -112,6 +112,13 @@ class EventStore(ABC):
     def clear(self) -> None:
         """Remove all events (testing utility)."""
 
+    def flush(self) -> None:
+        """Flush any buffered events to storage.
+
+        Default is a no-op; override for stores that buffer writes (e.g., Parquet).
+        """
+        # Default is a no-op; override when needed.
+
     def close(self) -> None:
         """Optional cleanup hook for stores managing external resources."""
         # Default is a no-op; override when needed.
