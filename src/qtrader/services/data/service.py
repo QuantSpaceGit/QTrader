@@ -519,8 +519,8 @@ class DataService:
 
             # If we've moved to a new timestamp, publish all bars from previous timestamp
             if current_timestamp is not None and ts != current_timestamp:
-                # Show debugger header BEFORE publishing events (if enabled)
-                if debugger is not None and debugger.should_pause(current_timestamp):
+                # Show debugger header BEFORE publishing events (step-through mode only)
+                if debugger is not None and debugger.should_pause_before_events(current_timestamp):
                     debugger.show_header(current_timestamp)
 
                 # Publish all bars at current_timestamp in sorted symbol order
@@ -545,7 +545,8 @@ class DataService:
                     time.sleep(replay_speed)
 
                 # Interactive debugger display and wait (if enabled)
-                if debugger is not None and debugger.should_pause(current_timestamp):
+                # Always call on_timestamp so event-triggered mode can evaluate breakpoints
+                if debugger is not None and debugger.enabled:
                     # Convert bars to dict format for display
                     bars_dict = {}
                     for sym in bars_at_current_ts.keys():
@@ -555,8 +556,7 @@ class DataService:
                         price_event = adapter.to_price_bar_event(bar_data)
                         bars_dict[sym] = price_event
 
-                    # TODO: Collect indicators, signals, portfolio state from services
-                    # For now, pass empty dicts - will enhance in future iterations
+                    # Debugger decides internally whether to actually pause
                     debugger.on_timestamp(
                         timestamp=current_timestamp,
                         bars=bars_dict,
@@ -583,8 +583,8 @@ class DataService:
 
         # Publish remaining bars from last timestamp
         if bars_at_current_ts and current_timestamp is not None:
-            # Show debugger header BEFORE publishing final events (if enabled)
-            if debugger is not None and debugger.should_pause(current_timestamp):
+            # Show debugger header BEFORE publishing final events (step-through mode only)
+            if debugger is not None and debugger.should_pause_before_events(current_timestamp):
                 debugger.show_header(current_timestamp)
 
             for sym in sorted(bars_at_current_ts.keys()):
@@ -608,7 +608,8 @@ class DataService:
                 time.sleep(replay_speed)
 
             # Interactive debugger display and wait for final timestamp (if enabled)
-            if debugger is not None and debugger.should_pause(current_timestamp):
+            # Always call on_timestamp so event-triggered mode can evaluate breakpoints
+            if debugger is not None and debugger.enabled:
                 # Convert bars to dict format for display
                 bars_dict = {}
                 for sym in bars_at_current_ts.keys():
@@ -618,8 +619,7 @@ class DataService:
                     price_event = adapter.to_price_bar_event(bar_data)
                     bars_dict[sym] = price_event
 
-                # TODO: Collect indicators, signals, portfolio state from services
-                # For now, pass empty dicts - will enhance in future iterations
+                # Debugger decides internally whether to actually pause
                 debugger.on_timestamp(
                     timestamp=current_timestamp,
                     bars=bars_dict,

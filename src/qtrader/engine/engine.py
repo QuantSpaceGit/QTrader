@@ -740,6 +740,14 @@ class BacktestEngine:
                 if self._debugger is not None and self._strategy_service is not None:
                     self._debugger.set_strategy_service(self._strategy_service)
 
+                # Give debugger access to portfolio service for collecting portfolio state
+                if self._debugger is not None and self._portfolio_service is not None:
+                    self._debugger.set_portfolio_service(self._portfolio_service)
+
+                # Give debugger access to event bus for signal subscription
+                if self._debugger is not None:
+                    self._debugger.set_event_bus(self._event_bus)
+
                 self._data_service.stream_universe(
                     symbols=list(source_symbols),
                     start_date=self.config.start_date,
@@ -785,7 +793,7 @@ class BacktestEngine:
 
             # Flush event store before reporting to ensure all events are written
             # This is critical for Parquet backend which buffers events in memory
-            if self._event_store is not None and hasattr(self._event_store, "flush"):
+            if self._event_store is not None:
                 try:
                     self._event_store.flush()
                     logger.debug("backtest.engine.event_store_flushed_before_reporting")

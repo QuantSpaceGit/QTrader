@@ -77,6 +77,11 @@ console = Console()
     help="Start interactive mode from specific date (YYYY-MM-DD)",
 )
 @click.option(
+    "--break-on",
+    multiple=True,
+    help="Pause only on specific events (e.g., 'signal', 'signal:BUY'). Can be repeated.",
+)
+@click.option(
     "--inspect",
     type=click.Choice(["bars", "full", "strategy"], case_sensitive=False),
     default="bars",
@@ -93,6 +98,7 @@ def backtest_command(
     html_report: bool,
     interactive: bool,
     break_at: Optional[datetime],
+    break_on: tuple[str, ...],
     inspect: str,
 ):
     """
@@ -135,6 +141,14 @@ def backtest_command(
         # Interactive from specific date with full inspection
         qtrader backtest experiments/momentum_strategy --interactive \\
             --break-at 2020-06-15 --inspect full
+
+        # Pause only on trading signals (event-triggered mode)
+        qtrader backtest experiments/momentum_strategy --interactive \\
+            --break-on signal
+
+        # Pause only on BUY signals from specific date
+        qtrader backtest experiments/momentum_strategy --interactive \\
+            --break-at 2020-06-15 --break-on signal:BUY
 
     \b
     Output Structure:
@@ -239,15 +253,20 @@ def backtest_command(
 
         # Initialize interactive debugger if requested
         debugger = None
-        if interactive:
+        if interactive or break_on:
+            # Enable interactive mode if --break-on is used (even without --interactive)
             debugger = InteractiveDebugger(
                 break_at=break_at.date() if break_at else None,
+                break_on=list(break_on) if break_on else None,
                 inspect_level=inspect.lower(),
                 enabled=True,
             )
-            console.print("[cyan]Interactive Mode:[/cyan] [yellow]Enabled[/yellow]")
+            mode = "event-triggered" if break_on else "step-through"
+            console.print(f"[cyan]Interactive Mode:[/cyan] [yellow]{mode}[/yellow]")
             if break_at:
                 console.print(f"  Break at: [yellow]{break_at.date()}[/yellow]")
+            if break_on:
+                console.print(f"  Break on: [magenta]{', '.join(break_on)}[/magenta]")
             console.print(f"  Inspect level: [yellow]{inspect}[/yellow]")
             console.print()
 

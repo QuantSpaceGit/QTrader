@@ -268,15 +268,29 @@ Artifacts: `experiments/{backtest_id}/runs` (metrics, equity curve, trades, conf
 QTrader includes an interactive debugger for step-through strategy development:
 
 ```bash
-# Pause at each timestamp to inspect state
+# Step-through mode: pause at each timestamp
 qtrader backtest experiments/sma_crossover --interactive
 
 # Start debugging from a specific date
 qtrader backtest experiments/sma_crossover --interactive --break-at 2020-06-15
 
+# Event-triggered mode: pause only on signals
+qtrader backtest experiments/sma_crossover --interactive --break-on signal
+
+# Pause only on BUY signals
+qtrader backtest experiments/sma_crossover --interactive --break-on signal:BUY
+
+# Combined: skip warmup, then pause on signals
+qtrader backtest experiments/sma_crossover --interactive --break-at 2020-06-15 --break-on signal
+
 # Control detail level (bars, full, strategy)
 qtrader backtest experiments/sma_crossover --interactive --inspect full
 ```
+
+**Debugging Modes:**
+
+- **Step-through** (default): Pause at every timestamp for manual stepping
+- **Event-triggered**: Run continuously, pause only when specific events occur (e.g., signals)
 
 **Interactive Commands:**
 
@@ -285,13 +299,20 @@ qtrader backtest experiments/sma_crossover --interactive --inspect full
 - `q` - Quit backtest
 - `i` - Toggle inspection level
 
+**Signal Breakpoint Filters:**
+
+- `signal` - Pause on any signal
+- `signal:BUY` - Pause on OPEN_LONG signals
+- `signal:SELL` - Pause on CLOSE_LONG signals
+- `signal:SHORT` / `signal:COVER` - Short position signals
+
 **Display Features:**
 
 - Unified table showing OHLCV bars with indicators as columns
-- Real-time strategy state at each timestamp
+- Real-time strategy state and signals at each timestamp
 - Clean console output with Rich formatting
 
-For detailed usage guide, see [docs/cli/interactive_debugging.md](docs/cli/interactive_debugging.md).
+For detailed usage guide, see [docs/cli/interactive.md](docs/cli/interactive.md).
 
 ### Programmatic API
 
@@ -337,22 +358,30 @@ ______________________________________________________________________
 
 ### Interactive Debugging Options
 
-| Flag                   | Purpose                                         |
-| ---------------------- | ----------------------------------------------- |
-| `--interactive` / `-i` | Enable step-through debugging mode              |
-| `--break-at DATE`      | Start pausing from specific date (YYYY-MM-DD)   |
-| `--inspect LEVEL`      | Set detail level: `bars`, `full`, or `strategy` |
+| Flag                   | Purpose                                             |
+| ---------------------- | --------------------------------------------------- |
+| `--interactive` / `-i` | Enable step-through debugging mode                  |
+| `--break-at DATE`      | Start pausing from specific date (YYYY-MM-DD)       |
+| `--break-on EVENT`     | Event-triggered mode (e.g., `signal`, `signal:BUY`) |
+| `--inspect LEVEL`      | Set detail level: `bars`, `full`, or `strategy`     |
 
-**Example:**
+**Examples:**
 
 ```bash
+# Step-through from a specific date
 qtrader backtest experiments/sma_crossover --interactive --break-at 2020-06-15 --inspect full
+
+# Event-triggered: pause only on BUY signals
+qtrader backtest experiments/sma_crossover --interactive --break-on signal:BUY
+
+# Combined: skip warmup, then pause on any signal
+qtrader backtest experiments/sma_crossover --interactive --break-at 2020-06-15 --break-on signal
 ```
 
 ### Documentation References
 
 - **Backtest Command**: [docs/packages/cli/backtest.md](docs/packages/cli/backtest.md)
-- **Interactive Debugging**: [docs/cli/interactive_debugging.md](docs/cli/interactive_debugging.md)
+- **Interactive Debugging**: [docs/cli/interactive.md](docs/cli/interactive.md)
 - **Strategy Development**: [docs/packages/strategy.md](docs/packages/strategy.md)
 - **Indicators**: [docs/packages/indicators/indicators.md](docs/packages/indicators/indicators.md)
 
