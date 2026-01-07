@@ -6,6 +6,17 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Changed
+
+- **Reporting Output**: Refactored timeseries and chart data exports from Parquet/CSV to JSON format
+  - Converted `equity_curve.parquet` → `equity_curve.json`
+  - Converted `returns.parquet` → `returns.json`
+  - Converted `trades.parquet` → `trades.json`
+  - Converted `drawdowns.parquet` → `drawdowns.json`
+  - Converted `timeline_{strategy}.csv` → `chart_data.json` (generic filename)
+  - Renamed `run_manifest.json` → `manifest.json`
+  - Browser-compatible JSON with ISO timestamp format for external visualization tools
+
 ### Added
 
 - **Event-Triggered Debugging**: Enhanced interactive debugger with breakpoint system

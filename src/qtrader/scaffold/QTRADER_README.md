@@ -148,11 +148,15 @@ Each experiment run creates an isolated directory with full provenance:
 
 ```
 experiments/{experiment_id}/runs/{timestamp}/
-├── run_manifest.json         # Run metadata (git info, environment, status)
+├── manifest.json             # Run metadata (git info, environment, status)
 ├── config_snapshot.yaml      # Config used for this run
 ├── events.parquet            # Complete event history
 ├── performance.json          # Summary metrics (Sharpe, returns, drawdown)
-├── equity_curve.parquet      # Time series of portfolio value
+├── timeseries/
+│   ├── equity_curve.json     # Time series of portfolio value
+│   ├── returns.json          # Period and cumulative returns
+│   ├── trades.json           # Complete trade history
+│   └── drawdowns.json        # Drawdown periods
 ├── trades.parquet            # All executed trades
 ├── returns.parquet           # Daily returns
 └── drawdowns.parquet         # Drawdown analysis
