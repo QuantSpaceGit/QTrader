@@ -66,8 +66,8 @@ class TestReportingIntegration:
         # Cleanup
         engine.shutdown()
 
-    def test_backtest_generates_timeseries_parquet(self, buy_hold_backtest_config, mock_system_config):
-        """Test that backtest generates time-series Parquet files.
+    def test_backtest_generates_timeseries_json(self, buy_hold_backtest_config, mock_system_config):
+        """Test that backtest generates time-series JSON files.
 
         Uses programmatically-created config, not external files.
         Writes to temporary directory, not user-facing output folder.
@@ -90,12 +90,12 @@ class TestReportingIntegration:
         ts_dir = latest_dir / "timeseries"
         assert ts_dir.exists(), f"timeseries directory not found in {latest_dir}"
 
-        # Check for core expected Parquet files
-        # Note: trades.parquet is only generated if there are closed trades
+        # Check for core expected JSON files
+        # Note: trades.json is only generated if there are closed trades
         expected_files = [
-            "equity_curve.parquet",
-            "returns.parquet",
-            "drawdowns.parquet",
+            "equity_curve.json",
+            "returns.json",
+            "drawdowns.json",
         ]
 
         for filename in expected_files:
@@ -103,10 +103,10 @@ class TestReportingIntegration:
             assert filepath.exists(), f"{filename} not found in {ts_dir}"
             assert filepath.stat().st_size > 0, f"{filename} is empty"
 
-        # trades.parquet is optional (only generated if there are closed trades)
-        trades_file = ts_dir / "trades.parquet"
+        # trades.json is optional (only generated if there are closed trades)
+        trades_file = ts_dir / "trades.json"
         if trades_file.exists():
-            assert trades_file.stat().st_size > 0, "trades.parquet is empty"  # Cleanup
+            assert trades_file.stat().st_size > 0, "trades.json is empty"  # Cleanup
         engine.shutdown()
 
     def test_backtest_event_store_and_reporting_same_directory(self, buy_hold_backtest_config, mock_system_config):
@@ -308,11 +308,12 @@ class TestReportingIntegration:
         latest_dir = max(timestamped_dirs, key=lambda p: p.name)
 
         # Check equity curve was sampled
-        import pyarrow.parquet as pq
+        import json
 
-        equity_file = latest_dir / "timeseries" / "equity_curve.parquet"
-        table = pq.read_table(equity_file)
-        row_count = table.num_rows
+        equity_file = latest_dir / "timeseries" / "equity_curve.json"
+        with open(equity_file) as f:
+            data = json.load(f)
+        row_count = len(data)
 
         # Should be <= max_equity_points (plus a few for peaks/troughs)
         assert row_count <= config.reporting.max_equity_points + 10, f"Equity curve should be sampled: {row_count} rows"

@@ -2,16 +2,14 @@
 
 Tests cover:
 - JSON report writing with Decimal handling
-- Parquet time-series writers (equity, returns, trades, drawdowns)
+- JSON time-series writers (equity, returns, trades, drawdowns)
 - CSV timeline writer with tall format
 """
 
-import csv
 import json
 from decimal import Decimal
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from qtrader.events.event_store import InMemoryEventStore
@@ -26,12 +24,12 @@ from qtrader.events.events import (
 from qtrader.libraries.performance.models import DrawdownPeriod, EquityCurvePoint, FullMetrics, ReturnPoint, TradeRecord
 from qtrader.services.reporting.writers import (
     DecimalEncoder,
-    write_drawdowns_parquet,
-    write_equity_curve_parquet,
+    write_drawdowns_json,
+    write_equity_curve_json,
     write_json_report,
-    write_returns_parquet,
-    write_strategy_timeline_csv,
-    write_trades_parquet,
+    write_returns_json,
+    write_strategy_chart_data,
+    write_trades_json,
 )
 
 # ============================================================================
@@ -493,54 +491,45 @@ class TestWriteJsonReport:
 # ============================================================================
 
 
-class TestWriteEquityCurveParquet:
-    """Test equity curve Parquet writer."""
+class TestWriteEquityCurveJson:
+    """Test equity curve JSON writer."""
 
     def test_write_equity_curve_creates_file(self, sample_equity_curve: list[EquityCurvePoint], tmp_output_dir: Path):
-        """write_equity_curve_parquet should create Parquet file."""
+        """write_equity_curve_json should create JSON file."""
         # Arrange
-        output_path = tmp_output_dir / "equity_curve.parquet"
+        output_path = tmp_output_dir / "equity_curve.json"
 
         # Act
-        write_equity_curve_parquet(sample_equity_curve, output_path)
+        write_equity_curve_json(sample_equity_curve, output_path)
 
         # Assert
         assert output_path.exists()
         assert output_path.stat().st_size > 0
 
     def test_write_equity_curve_content_valid(self, sample_equity_curve: list[EquityCurvePoint], tmp_output_dir: Path):
-        """Parquet content should match input data."""
+        """JSON content should match input data."""
         # Arrange
-        output_path = tmp_output_dir / "equity_curve.parquet"
+        output_path = tmp_output_dir / "equity_curve.json"
 
         # Act
-        write_equity_curve_parquet(sample_equity_curve, output_path)
+        write_equity_curve_json(sample_equity_curve, output_path)
 
         # Assert
-        df = pd.read_parquet(output_path)
-        assert len(df) == 2
-        assert list(df.columns) == [
-            "timestamp",
-            "equity",
-            "cash",
-            "positions_value",
-            "num_positions",
-            "gross_exposure",
-            "net_exposure",
-            "leverage",
-            "drawdown_pct",
-            "underwater",
-        ]
-        assert df.iloc[0]["equity"] == 100000.0
-        assert df.iloc[1]["equity"] == 101500.0  # Match fixture data
+        with open(output_path) as f:
+            data = json.load(f)
+        assert len(data) == 2
+        assert "timestamp" in data[0]
+        assert "equity" in data[0]
+        assert data[0]["equity"] == 100000.0
+        assert data[1]["equity"] == 101500.0  # Match fixture data
 
     def test_write_equity_curve_empty_list_logs_warning(self, tmp_output_dir: Path, caplog):
         """Empty equity curve should log warning and not create file."""
         # Arrange
-        output_path = tmp_output_dir / "equity_curve.parquet"
+        output_path = tmp_output_dir / "equity_curve.json"
 
         # Act
-        write_equity_curve_parquet([], output_path)
+        write_equity_curve_json([], output_path)
 
         # Assert
         assert not output_path.exists()
@@ -551,10 +540,10 @@ class TestWriteEquityCurveParquet:
     ):
         """Writer should create parent directories if missing."""
         # Arrange
-        output_path = tmp_output_dir / "nested" / "equity_curve.parquet"
+        output_path = tmp_output_dir / "nested" / "equity_curve.json"
 
         # Act
-        write_equity_curve_parquet(sample_equity_curve, output_path)
+        write_equity_curve_json(sample_equity_curve, output_path)
 
         # Assert
         assert output_path.exists()
@@ -565,42 +554,44 @@ class TestWriteEquityCurveParquet:
 # ============================================================================
 
 
-class TestWriteReturnsParquet:
-    """Test returns Parquet writer."""
+class TestWriteReturnsJson:
+    """Test returns JSON writer."""
 
     def test_write_returns_creates_file(self, sample_returns: list[ReturnPoint], tmp_output_dir: Path):
-        """write_returns_parquet should create Parquet file."""
+        """write_returns_json should create JSON file."""
         # Arrange
-        output_path = tmp_output_dir / "returns.parquet"
+        output_path = tmp_output_dir / "returns.json"
 
         # Act
-        write_returns_parquet(sample_returns, output_path)
+        write_returns_json(sample_returns, output_path)
 
         # Assert
         assert output_path.exists()
 
     def test_write_returns_content_valid(self, sample_returns: list[ReturnPoint], tmp_output_dir: Path):
-        """Parquet content should match input data."""
+        """JSON content should match input data."""
         # Arrange
-        output_path = tmp_output_dir / "returns.parquet"
+        output_path = tmp_output_dir / "returns.json"
 
         # Act
-        write_returns_parquet(sample_returns, output_path)
+        write_returns_json(sample_returns, output_path)
 
         # Assert
-        df = pd.read_parquet(output_path)
-        assert len(df) == 2
-        assert list(df.columns) == ["timestamp", "period_return", "cumulative_return", "log_return"]
-        assert df.iloc[0]["period_return"] == 0.0
-        assert df.iloc[1]["period_return"] == pytest.approx(0.015)  # Match fixture data
+        with open(output_path) as f:
+            data = json.load(f)
+        assert len(data) == 2
+        assert "timestamp" in data[0]
+        assert "period_return" in data[0]
+        assert data[0]["period_return"] == 0.0
+        assert data[1]["period_return"] == pytest.approx(0.015)  # Match fixture data
 
     def test_write_returns_empty_list_logs_warning(self, tmp_output_dir: Path, caplog):
         """Empty returns should log warning and not create file."""
         # Arrange
-        output_path = tmp_output_dir / "returns.parquet"
+        output_path = tmp_output_dir / "returns.json"
 
         # Act
-        write_returns_parquet([], output_path)
+        write_returns_json([], output_path)
 
         # Assert
         assert not output_path.exists()
@@ -612,45 +603,46 @@ class TestWriteReturnsParquet:
 # ============================================================================
 
 
-class TestWriteTradesParquet:
-    """Test trades Parquet writer."""
+class TestWriteTradesJson:
+    """Test trades JSON writer."""
 
     def test_write_trades_creates_file(self, sample_trades: list[TradeRecord], tmp_output_dir: Path):
-        """write_trades_parquet should create Parquet file."""
+        """write_trades_json should create JSON file."""
         # Arrange
-        output_path = tmp_output_dir / "trades.parquet"
+        output_path = tmp_output_dir / "trades.json"
 
         # Act
-        write_trades_parquet(sample_trades, output_path)
+        write_trades_json(sample_trades, output_path)
 
         # Assert
         assert output_path.exists()
 
     def test_write_trades_content_valid(self, sample_trades: list[TradeRecord], tmp_output_dir: Path):
-        """Parquet content should match input data."""
+        """JSON content should match input data."""
         # Arrange
-        output_path = tmp_output_dir / "trades.parquet"
+        output_path = tmp_output_dir / "trades.json"
 
         # Act
-        write_trades_parquet(sample_trades, output_path)
+        write_trades_json(sample_trades, output_path)
 
         # Assert
-        df = pd.read_parquet(output_path)
-        assert len(df) == 2
-        assert "trade_id" in df.columns
-        assert "symbol" in df.columns
-        assert "pnl" in df.columns
-        assert df.iloc[0]["symbol"] == "AAPL"
-        assert df.iloc[0]["is_winner"]
-        assert not df.iloc[1]["is_winner"]
+        with open(output_path) as f:
+            data = json.load(f)
+        assert len(data) == 2
+        assert "trade_id" in data[0]
+        assert "symbol" in data[0]
+        assert "pnl" in data[0]
+        assert data[0]["symbol"] == "AAPL"
+        assert data[0]["is_winner"]
+        assert not data[1]["is_winner"]
 
     def test_write_trades_empty_list_logs_warning(self, tmp_output_dir: Path, caplog):
         """Empty trades should log warning and not create file."""
         # Arrange
-        output_path = tmp_output_dir / "trades.parquet"
+        output_path = tmp_output_dir / "trades.json"
 
         # Act
-        write_trades_parquet([], output_path)
+        write_trades_json([], output_path)
 
         # Assert
         assert not output_path.exists()
@@ -662,43 +654,44 @@ class TestWriteTradesParquet:
 # ============================================================================
 
 
-class TestWriteDrawdownsParquet:
-    """Test drawdowns Parquet writer."""
+class TestWriteDrawdownsJson:
+    """Test drawdowns JSON writer."""
 
     def test_write_drawdowns_creates_file(self, sample_drawdowns: list[DrawdownPeriod], tmp_output_dir: Path):
-        """write_drawdowns_parquet should create Parquet file."""
+        """write_drawdowns_json should create JSON file."""
         # Arrange
-        output_path = tmp_output_dir / "drawdowns.parquet"
+        output_path = tmp_output_dir / "drawdowns.json"
 
         # Act
-        write_drawdowns_parquet(sample_drawdowns, output_path)
+        write_drawdowns_json(sample_drawdowns, output_path)
 
         # Assert
         assert output_path.exists()
 
     def test_write_drawdowns_content_valid(self, sample_drawdowns: list[DrawdownPeriod], tmp_output_dir: Path):
-        """Parquet content should match input data."""
+        """JSON content should match input data."""
         # Arrange
-        output_path = tmp_output_dir / "drawdowns.parquet"
+        output_path = tmp_output_dir / "drawdowns.json"
 
         # Act
-        write_drawdowns_parquet(sample_drawdowns, output_path)
+        write_drawdowns_json(sample_drawdowns, output_path)
 
         # Assert
-        df = pd.read_parquet(output_path)
-        assert len(df) == 2
-        assert "drawdown_id" in df.columns
-        assert "depth_pct" in df.columns
-        assert df.iloc[0]["recovered"]
-        assert not df.iloc[1]["recovered"]
+        with open(output_path) as f:
+            data = json.load(f)
+        assert len(data) == 2
+        assert "drawdown_id" in data[0]
+        assert "depth_pct" in data[0]
+        assert data[0]["recovered"]
+        assert not data[1]["recovered"]
 
     def test_write_drawdowns_empty_list_logs_warning(self, tmp_output_dir: Path, caplog):
         """Empty drawdowns should log warning and not create file."""
         # Arrange
-        output_path = tmp_output_dir / "drawdowns.parquet"
+        output_path = tmp_output_dir / "drawdowns.json"
 
         # Act
-        write_drawdowns_parquet([], output_path)
+        write_drawdowns_json([], output_path)
 
         # Assert
         assert not output_path.exists()
@@ -706,38 +699,42 @@ class TestWriteDrawdownsParquet:
 
 
 # ============================================================================
-# CSV Timeline Writer Tests
+# Chart Data Writer Tests
 # ============================================================================
 
 
-class TestWriteStrategyTimelineCSV:
-    """Test CSV timeline writer."""
+class TestWriteStrategyChartData:
+    """Test chart data JSON writer."""
 
-    def test_write_timeline_csv_creates_file(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
-        """write_strategy_timeline_csv should create CSV file."""
+    def test_write_chart_data_creates_file(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
+        """write_strategy_chart_data should create JSON file."""
         # Arrange
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(sample_event_store, "test_strategy", output_path)
+        write_strategy_chart_data(sample_event_store, "test_strategy", output_path)
 
         # Assert
         assert output_path.exists()
         assert output_path.stat().st_size > 0
 
-    def test_write_timeline_csv_has_correct_schema(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
-        """CSV should have uniform schema with all expected columns."""
+    def test_write_chart_data_has_correct_schema(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
+        """JSON should have uniform schema with all expected fields."""
         # Arrange
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(sample_event_store, "test_strategy", output_path)
+        write_strategy_chart_data(sample_event_store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            fieldnames = reader.fieldnames
+        with open(output_path) as f:
+            data = json.load(f)
 
+        assert isinstance(data, list)
+        assert len(data) > 0
+
+        # Check first row has expected fields
+        first_row = data[0]
         expected_fields = [
             "timestamp",
             "strategy_id",
@@ -787,93 +784,90 @@ class TestWriteStrategyTimelineCSV:
             "trade_exit_price",  # NEW: Tier 3 - Average exit price
             "trade_realized_pnl",  # NEW: Tier 2 - P&L when closed
         ]
-        assert fieldnames == expected_fields
+        for field in expected_fields:
+            assert field in first_row, f"Missing field: {field}"
 
-    def test_write_timeline_csv_includes_bar_rows(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
-        """CSV should include rows for price bars."""
+    def test_write_chart_data_includes_bar_rows(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
+        """JSON should include objects for price bars."""
         # Arrange
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(sample_event_store, "test_strategy", output_path)
+        write_strategy_chart_data(sample_event_store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
         # Find bar rows (ticker == underlying, not synthetic)
-        bar_rows = [r for r in rows if r["ticker"] == "AAPL" and r["underlying"] == "AAPL" and r["open"]]
+        bar_rows = [r for r in data if r["ticker"] == "AAPL" and r["underlying"] == "AAPL" and r["open"] is not None]
         assert len(bar_rows) == 2
-        assert bar_rows[0]["open"] == "150.0"
-        assert bar_rows[0]["close"] == "151.0"
-        assert bar_rows[0]["volume"] == "1000000"
+        assert bar_rows[0]["open"] == 150.0
+        assert bar_rows[0]["close"] == 151.0
+        assert bar_rows[0]["volume"] == 1000000
 
-    def test_write_timeline_csv_includes_indicator_rows(
+    def test_write_chart_data_includes_indicator_rows(
         self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path
     ):
-        """CSV should include synthetic ticker rows for indicators."""
+        """JSON should include synthetic ticker objects for indicators."""
         # Arrange
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(sample_event_store, "test_strategy", output_path)
+        write_strategy_chart_data(sample_event_store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
         # Find indicator rows (ticker is indicator name, underlying is symbol)
-        indicator_rows = [r for r in rows if r["ticker"] == "sma_10"]
+        indicator_rows = [r for r in data if r["ticker"] == "sma_10"]
         assert len(indicator_rows) == 2
         assert indicator_rows[0]["underlying"] == "AAPL"
         assert float(indicator_rows[0]["close"]) == pytest.approx(150.5)
-        assert indicator_rows[0]["open"] == ""  # Should be empty for indicators
+        assert indicator_rows[0]["open"] is None  # Should be None for indicators
 
-    def test_write_timeline_csv_includes_portfolio_metrics(
+    def test_write_chart_data_includes_portfolio_metrics(
         self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path
     ):
-        """CSV should include synthetic ticker rows for portfolio metrics."""
+        """JSON should include synthetic ticker objects for portfolio metrics."""
         # Arrange
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(sample_event_store, "test_strategy", output_path)
+        write_strategy_chart_data(sample_event_store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
         # Find portfolio metric rows
-        equity_rows = [r for r in rows if r["ticker"] == "EQUITY"]
+        equity_rows = [r for r in data if r["ticker"] == "EQUITY"]
         assert len(equity_rows) == 2
         assert equity_rows[0]["underlying"] == "PORTFOLIO"
         assert float(equity_rows[0]["close"]) == 100000.0
 
         # Check cash metric rows (both timestamps should have cash data)
-        cash_rows = [r for r in rows if r["ticker"] == "CASH"]
+        cash_rows = [r for r in data if r["ticker"] == "CASH"]
         assert len(cash_rows) == 2  # Both timestamps have cash
         assert float(cash_rows[0]["close"]) == 85000.0
 
-    def test_write_timeline_csv_includes_trading_events(
+    def test_write_chart_data_includes_trading_events(
         self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path
     ):
-        """CSV should include signal, order, and fill data in bar rows."""
+        """JSON should include signal, order, and fill data in bar objects."""
         # Arrange
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(sample_event_store, "test_strategy", output_path)
+        write_strategy_chart_data(sample_event_store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
         # Find bar row with trading events
-        bar_with_events = [r for r in rows if r["ticker"] == "AAPL" and r["signal_intention"]]
+        bar_with_events = [r for r in data if r["ticker"] == "AAPL" and r["signal_intention"]]
         assert len(bar_with_events) == 1
         assert bar_with_events[0]["signal_intention"] == "OPEN_LONG"
         assert float(bar_with_events[0]["signal_price"]) == 151.0
@@ -882,7 +876,7 @@ class TestWriteStrategyTimelineCSV:
         assert float(bar_with_events[0]["fill_price"]) == pytest.approx(151.10)
         assert float(bar_with_events[0]["commission"]) == pytest.approx(1.50)
 
-    def test_write_timeline_csv_filters_by_strategy(self, tmp_output_dir: Path):
+    def test_write_chart_data_filters_by_strategy(self, tmp_output_dir: Path):
         """CSV should only include events for the specified strategy."""
         # Arrange
         store = InMemoryEventStore()
@@ -904,23 +898,22 @@ class TestWriteStrategyTimelineCSV:
         store.append(indicator1)
         store.append(indicator2)
 
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(store, "test_strategy", output_path)
+        write_strategy_chart_data(store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
         # Should only have indicator for test_strategy
-        indicator_rows = [r for r in rows if r["ticker"] == "sma_10"]
+        indicator_rows = [r for r in data if r["ticker"] == "sma_10"]
         assert len(indicator_rows) == 1
         assert float(indicator_rows[0]["close"]) == pytest.approx(150.5)
 
-    def test_write_timeline_csv_skips_non_numeric_indicators(self, tmp_output_dir: Path):
-        """CSV should skip string indicators but convert boolean to numeric."""
+    def test_write_chart_data_skips_non_numeric_indicators(self, tmp_output_dir: Path):
+        """JSON should skip string indicators but convert boolean to numeric."""
         # Arrange
         store = InMemoryEventStore()
 
@@ -936,17 +929,16 @@ class TestWriteStrategyTimelineCSV:
         )
         store.append(indicator)
 
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(store, "test_strategy", output_path)
+        write_strategy_chart_data(store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
-        indicator_rows = [r for r in rows if r["ticker"] in ("sma_10", "crossover", "signal_text")]
+        indicator_rows = [r for r in data if r["ticker"] in ("sma_10", "crossover", "signal_text")]
         # Should have sma_10 and crossover (boolean converts to float), but not signal_text (string)
         assert len(indicator_rows) == 2
         sma_row = [r for r in indicator_rows if r["ticker"] == "sma_10"][0]
@@ -954,19 +946,19 @@ class TestWriteStrategyTimelineCSV:
         cross_row = [r for r in indicator_rows if r["ticker"] == "crossover"][0]
         assert float(cross_row["close"]) == pytest.approx(1.0)
 
-    def test_write_timeline_csv_empty_store_logs_warning(self, tmp_output_dir: Path, caplog):
+    def test_write_chart_data_empty_store_logs_warning(self, tmp_output_dir: Path, caplog):
         """Empty event store should log warning."""
         # Arrange
         store = InMemoryEventStore()
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(store, "test_strategy", output_path)
+        write_strategy_chart_data(store, "test_strategy", output_path)
 
         # Assert
-        assert "strategy_timeline.no_data" in caplog.text
+        assert "strategy_chart_data.no_data" in caplog.text
 
-    def test_write_timeline_csv_aggregates_multiple_orders(self, tmp_output_dir: Path):
+    def test_write_chart_data_aggregates_multiple_orders(self, tmp_output_dir: Path):
         """Multiple orders at same timestamp should be aggregated."""
         # Arrange
         store = InMemoryEventStore()
@@ -1003,21 +995,20 @@ class TestWriteStrategyTimelineCSV:
         store.append(order1)
         store.append(order2)
 
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(store, "test_strategy", output_path)
+        write_strategy_chart_data(store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
-        bar_rows = [r for r in rows if r["ticker"] == "AAPL" and r["order_qty"]]
+        bar_rows = [r for r in data if r["ticker"] == "AAPL" and r["order_qty"]]
         assert len(bar_rows) == 1
         assert int(bar_rows[0]["order_qty"]) == 80  # 50 + 30
 
-    def test_write_timeline_csv_aggregates_multiple_fills(self, tmp_output_dir: Path):
+    def test_write_chart_data_aggregates_multiple_fills(self, tmp_output_dir: Path):
         """Multiple fills at same timestamp should be aggregated with weighted average price."""
         # Arrange
         store = InMemoryEventStore()
@@ -1056,36 +1047,35 @@ class TestWriteStrategyTimelineCSV:
         store.append(fill1)
         store.append(fill2)
 
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(store, "test_strategy", output_path)
+        write_strategy_chart_data(store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
-        bar_rows = [r for r in rows if r["ticker"] == "AAPL" and r["fill_qty"]]
+        bar_rows = [r for r in data if r["ticker"] == "AAPL" and r["fill_qty"]]
         assert len(bar_rows) == 1
         assert int(bar_rows[0]["fill_qty"]) == 80  # 50 + 30
         # Weighted average: (50*151.00 + 30*151.50) / 80 = 151.1875
         assert float(bar_rows[0]["fill_price"]) == pytest.approx(151.1875)
         assert float(bar_rows[0]["commission"]) == pytest.approx(1.60)  # 1.00 + 0.60
 
-    def test_write_timeline_csv_creates_parent_dirs(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
+    def test_write_chart_data_creates_parent_dirs(self, sample_event_store: InMemoryEventStore, tmp_output_dir: Path):
         """Writer should create parent directories if missing."""
         # Arrange
-        output_path = tmp_output_dir / "nested" / "dir" / "timeline.csv"
+        output_path = tmp_output_dir / "nested" / "dir" / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(sample_event_store, "test_strategy", output_path)
+        write_strategy_chart_data(sample_event_store, "test_strategy", output_path)
 
         # Assert
         assert output_path.exists()
 
-    def test_write_timeline_csv_timestamps_sorted(self, tmp_output_dir: Path):
-        """CSV rows should be sorted by timestamp."""
+    def test_write_chart_data_timestamps_sorted(self, tmp_output_dir: Path):
+        """JSON objects should be sorted by timestamp."""
         # Arrange
         store = InMemoryEventStore()
 
@@ -1113,21 +1103,20 @@ class TestWriteStrategyTimelineCSV:
         store.append(bar2)
         store.append(bar1)
 
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(store, "test_strategy", output_path)
+        write_strategy_chart_data(store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
-        bar_rows = [r for r in rows if r["ticker"] == "AAPL"]
+        bar_rows = [r for r in data if r["ticker"] == "AAPL"]
         assert bar_rows[0]["timestamp"] == "2023-01-01T10:00:00+00:00"
         assert bar_rows[1]["timestamp"] == "2023-01-03T10:00:00+00:00"
 
-    def test_write_timeline_csv_includes_indicator_display_names(self, tmp_output_dir: Path):
+    def test_write_chart_data_includes_indicator_display_names(self, tmp_output_dir: Path):
         """CSV should include indicator display names with parameters."""
         # Arrange
         store = InMemoryEventStore()
@@ -1159,21 +1148,20 @@ class TestWriteStrategyTimelineCSV:
         store.append(bar)
         store.append(indicator)
 
-        output_path = tmp_output_dir / "timeline.csv"
+        output_path = tmp_output_dir / "chart_data.json"
 
         # Act
-        write_strategy_timeline_csv(store, "test_strategy", output_path)
+        write_strategy_chart_data(store, "test_strategy", output_path)
 
         # Assert
-        with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+        with open(output_path) as f:
+            data = json.load(f)
 
         # Find indicator rows with display names
-        fast_sma_rows = [r for r in rows if r["ticker"] == "fast_sma(10)"]
-        slow_sma_rows = [r for r in rows if r["ticker"] == "slow_sma(50)"]
-        rsi_rows = [r for r in rows if r["ticker"] == "rsi(14)"]
-        bb_rows = [r for r in rows if r["ticker"] == "bb_upper(period=20,std=2.0)"]
+        fast_sma_rows = [r for r in data if r["ticker"] == "fast_sma(10)"]
+        slow_sma_rows = [r for r in data if r["ticker"] == "slow_sma(50)"]
+        rsi_rows = [r for r in data if r["ticker"] == "rsi(14)"]
+        bb_rows = [r for r in data if r["ticker"] == "bb_upper(period=20,std=2.0)"]
 
         assert len(fast_sma_rows) == 1
         assert fast_sma_rows[0]["underlying"] == "AAPL"
