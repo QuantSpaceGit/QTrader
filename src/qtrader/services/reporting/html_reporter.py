@@ -28,8 +28,8 @@ class HTMLReportGenerator:
         Args:
             output_dir: Path to the backtest output directory containing:
                 - performance.json
-                - run_manifest.json (optional)
-                - timeseries/*.parquet files
+                - manifest.json (optional)
+                - timeseries/*.json files
                 - events.parquet
         """
         self.output_dir = Path(output_dir)
@@ -51,9 +51,9 @@ class HTMLReportGenerator:
         manifest = self._load_manifest()
         metadata = self._load_metadata()
         config_snapshot = self._load_config_snapshot()
-        equity_curve = self._load_timeseries("equity_curve.parquet")
-        returns = self._load_timeseries("returns.parquet")
-        drawdowns = self._load_timeseries("drawdowns.parquet")
+        equity_curve = self._load_timeseries("equity_curve.json")
+        returns = self._load_timeseries("returns.json")
+        drawdowns = self._load_timeseries("drawdowns.json")
         trades = self._load_trades()
 
         # Generate HTML sections
@@ -83,23 +83,32 @@ class HTMLReportGenerator:
         return data
 
     def _load_manifest(self) -> dict[str, Any] | None:
-        """Load run_manifest.json (optional)."""
-        manifest_path = self.output_dir / "run_manifest.json"
+        """Load manifest.json (optional)."""
+        manifest_path = self.output_dir / "manifest.json"
         if manifest_path.exists():
             data: dict[str, Any] = json.loads(manifest_path.read_text())
             return data
         return None
 
     def _load_timeseries(self, filename: str) -> pd.DataFrame | None:
-        """Load a timeseries parquet file (returns None if not found)."""
+        """Load a timeseries JSON file (returns None if not found)."""
         filepath = self.timeseries_dir / filename
         if filepath.exists():
-            df = pd.read_parquet(filepath)
+            # Load JSON data
+            with filepath.open("r") as f:
+                data = json.load(f)
 
-            # Handle duplicate timestamps by keeping the last value for each timestamp
-            # This can occur when multiple portfolio state events are emitted at the same time
-            if "timestamp" in df.columns and df["timestamp"].duplicated().any():
-                df = df.drop_duplicates(subset=["timestamp"], keep="last")
+            # Convert to DataFrame
+            df = pd.DataFrame(data)
+
+            # Convert timestamp strings to datetime if present
+            if "timestamp" in df.columns:
+                df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+                # Handle duplicate timestamps by keeping the last value for each timestamp
+                # This can occur when multiple portfolio state events are emitted at the same time
+                if df["timestamp"].duplicated().any():
+                    df = df.drop_duplicates(subset=["timestamp"], keep="last")
 
             return df
         return None

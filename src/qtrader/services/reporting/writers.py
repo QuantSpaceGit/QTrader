@@ -1,9 +1,8 @@
 """Output writers for performance reports and time-series data.
 
-Handles JSON summary reports, Parquet time-series exports, and CSV timeline exports.
+Handles JSON summary reports, JSON time-series exports, and CSV timeline exports.
 """
 
-import csv
 import json
 from collections import defaultdict
 from datetime import datetime
@@ -11,7 +10,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 from structlog import get_logger
 
 from qtrader.events.event_store import EventStore
@@ -64,19 +62,19 @@ def write_json_report(metrics: FullMetrics, output_path: Path) -> None:
     logger.info("JSON report written", path=str(output_path), size_bytes=output_path.stat().st_size)
 
 
-def write_equity_curve_parquet(equity_curve: list[EquityCurvePoint], output_path: Path) -> None:
+def write_equity_curve_json(equity_curve: list[EquityCurvePoint], output_path: Path) -> None:
     """
-    Write equity curve time-series to Parquet using pandas.
+    Write equity curve time-series to JSON.
 
-    Creates columnar Parquet file for efficient storage and analysis.
+    Creates browser-friendly JSON file with ISO timestamp format.
 
     Args:
         equity_curve: List of equity curve data points
-        output_path: Path to write Parquet file
+        output_path: Path to write JSON file
 
     Example:
         >>> points = [EquityCurvePoint(...), ...]
-        >>> write_equity_curve_parquet(points, Path("output/run_001/equity_curve.parquet"))
+        >>> write_equity_curve_json(points, Path("output/run_001/timeseries/equity_curve.json"))
     """
     if not equity_curve:
         logger.warning("No equity curve data to write")
@@ -84,24 +82,26 @@ def write_equity_curve_parquet(equity_curve: list[EquityCurvePoint], output_path
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Convert to pandas DataFrame
-    df = pd.DataFrame(
+    # Convert to list of dicts with ISO timestamps
+    data = [
         {
-            "timestamp": [p.timestamp for p in equity_curve],
-            "equity": [float(p.equity) for p in equity_curve],
-            "cash": [float(p.cash) for p in equity_curve],
-            "positions_value": [float(p.positions_value) for p in equity_curve],
-            "num_positions": [p.num_positions for p in equity_curve],
-            "gross_exposure": [float(p.gross_exposure) for p in equity_curve],
-            "net_exposure": [float(p.net_exposure) for p in equity_curve],
-            "leverage": [float(p.leverage) for p in equity_curve],
-            "drawdown_pct": [float(p.drawdown_pct) for p in equity_curve],
-            "underwater": [p.underwater for p in equity_curve],
+            "timestamp": p.timestamp.isoformat() if hasattr(p.timestamp, "isoformat") else str(p.timestamp),
+            "equity": float(p.equity),
+            "cash": float(p.cash),
+            "positions_value": float(p.positions_value),
+            "num_positions": p.num_positions,
+            "gross_exposure": float(p.gross_exposure),
+            "net_exposure": float(p.net_exposure),
+            "leverage": float(p.leverage),
+            "drawdown_pct": float(p.drawdown_pct),
+            "underwater": p.underwater,
         }
-    )
+        for p in equity_curve
+    ]
 
-    # Write with compression
-    df.to_parquet(output_path, compression="zstd", index=False)
+    # Write JSON
+    with output_path.open("w") as f:
+        json.dump(data, f, indent=2, cls=DecimalEncoder)
 
     logger.info(
         "Equity curve written",
@@ -111,19 +111,19 @@ def write_equity_curve_parquet(equity_curve: list[EquityCurvePoint], output_path
     )
 
 
-def write_returns_parquet(returns: list[ReturnPoint], output_path: Path) -> None:
+def write_returns_json(returns: list[ReturnPoint], output_path: Path) -> None:
     """
-    Write returns time-series to Parquet using pandas.
+    Write returns time-series to JSON.
 
-    Creates columnar Parquet file with period and cumulative returns.
+    Creates browser-friendly JSON file with period and cumulative returns.
 
     Args:
         returns: List of return data points
-        output_path: Path to write Parquet file
+        output_path: Path to write JSON file
 
     Example:
         >>> returns = [ReturnPoint(...), ...]
-        >>> write_returns_parquet(returns, Path("output/run_001/returns.parquet"))
+        >>> write_returns_json(returns, Path("output/run_001/timeseries/returns.json"))
     """
     if not returns:
         logger.warning("No returns data to write")
@@ -131,18 +131,20 @@ def write_returns_parquet(returns: list[ReturnPoint], output_path: Path) -> None
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Convert to pandas DataFrame
-    df = pd.DataFrame(
+    # Convert to list of dicts with ISO timestamps
+    data = [
         {
-            "timestamp": [r.timestamp for r in returns],
-            "period_return": [float(r.period_return) for r in returns],
-            "cumulative_return": [float(r.cumulative_return) for r in returns],
-            "log_return": [float(r.log_return) for r in returns],
+            "timestamp": r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+            "period_return": float(r.period_return),
+            "cumulative_return": float(r.cumulative_return),
+            "log_return": float(r.log_return),
         }
-    )
+        for r in returns
+    ]
 
-    # Write with compression
-    df.to_parquet(output_path, compression="zstd", index=False)
+    # Write JSON
+    with output_path.open("w") as f:
+        json.dump(data, f, indent=2, cls=DecimalEncoder)
 
     logger.info(
         "Returns written",
@@ -152,19 +154,19 @@ def write_returns_parquet(returns: list[ReturnPoint], output_path: Path) -> None
     )
 
 
-def write_trades_parquet(trades: list[TradeRecord], output_path: Path) -> None:
+def write_trades_json(trades: list[TradeRecord], output_path: Path) -> None:
     """
-    Write trade records to Parquet using pandas.
+    Write trade records to JSON.
 
-    Creates columnar Parquet file with complete trade history.
+    Creates browser-friendly JSON file with complete trade history.
 
     Args:
         trades: List of completed trades
-        output_path: Path to write Parquet file
+        output_path: Path to write JSON file
 
     Example:
         >>> trades = [TradeRecord(...), ...]
-        >>> write_trades_parquet(trades, Path("output/run_001/trades.parquet"))
+        >>> write_trades_json(trades, Path("output/run_001/timeseries/trades.json"))
     """
     if not trades:
         logger.warning("No trades to write")
@@ -172,29 +174,35 @@ def write_trades_parquet(trades: list[TradeRecord], output_path: Path) -> None:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Convert to pandas DataFrame
-    df = pd.DataFrame(
+    # Convert to list of dicts with ISO timestamps
+    data = [
         {
-            "trade_id": [t.trade_id for t in trades],
-            "strategy_id": [t.strategy_id for t in trades],
-            "symbol": [t.symbol for t in trades],
-            "entry_timestamp": [t.entry_timestamp for t in trades],
-            "exit_timestamp": [t.exit_timestamp for t in trades],
-            "entry_price": [float(t.entry_price) for t in trades],
-            "exit_price": [float(t.exit_price) for t in trades],
-            "quantity": [t.quantity for t in trades],
-            "side": [t.side for t in trades],
-            "pnl": [float(t.pnl) for t in trades],
-            "pnl_pct": [float(t.pnl_pct) for t in trades],
-            "commission": [float(t.commission) for t in trades],
-            "duration_seconds": [t.duration_seconds for t in trades],
-            "duration_days": [t.duration_days for t in trades],
-            "is_winner": [t.is_winner for t in trades],
+            "trade_id": t.trade_id,
+            "strategy_id": t.strategy_id,
+            "symbol": t.symbol,
+            "entry_timestamp": t.entry_timestamp.isoformat()
+            if hasattr(t.entry_timestamp, "isoformat")
+            else str(t.entry_timestamp),
+            "exit_timestamp": t.exit_timestamp.isoformat()
+            if hasattr(t.exit_timestamp, "isoformat")
+            else str(t.exit_timestamp),
+            "entry_price": float(t.entry_price),
+            "exit_price": float(t.exit_price),
+            "quantity": t.quantity,
+            "side": t.side,
+            "pnl": float(t.pnl),
+            "pnl_pct": float(t.pnl_pct),
+            "commission": float(t.commission),
+            "duration_seconds": t.duration_seconds,
+            "duration_days": t.duration_days,
+            "is_winner": t.is_winner,
         }
-    )
+        for t in trades
+    ]
 
-    # Write with compression
-    df.to_parquet(output_path, compression="zstd", index=False)
+    # Write JSON
+    with output_path.open("w") as f:
+        json.dump(data, f, indent=2, cls=DecimalEncoder)
 
     logger.info(
         "Trades written",
@@ -204,19 +212,19 @@ def write_trades_parquet(trades: list[TradeRecord], output_path: Path) -> None:
     )
 
 
-def write_drawdowns_parquet(drawdowns: list[DrawdownPeriod], output_path: Path) -> None:
+def write_drawdowns_json(drawdowns: list[DrawdownPeriod], output_path: Path) -> None:
     """
-    Write drawdown periods to Parquet using pandas.
+    Write drawdown periods to JSON.
 
-    Creates columnar Parquet file with drawdown history.
+    Creates browser-friendly JSON file with drawdown history.
 
     Args:
         drawdowns: List of drawdown periods
-        output_path: Path to write Parquet file
+        output_path: Path to write JSON file
 
     Example:
         >>> drawdowns = [DrawdownPeriod(...), ...]
-        >>> write_drawdowns_parquet(drawdowns, Path("output/run_001/drawdowns.parquet"))
+        >>> write_drawdowns_json(drawdowns, Path("output/run_001/timeseries/drawdowns.json"))
     """
     if not drawdowns:
         logger.warning("No drawdowns to write")
@@ -224,25 +232,33 @@ def write_drawdowns_parquet(drawdowns: list[DrawdownPeriod], output_path: Path) 
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Convert to pandas DataFrame
-    df = pd.DataFrame(
+    # Convert to list of dicts with ISO timestamps
+    data = [
         {
-            "drawdown_id": [d.drawdown_id for d in drawdowns],
-            "start_timestamp": [d.start_timestamp for d in drawdowns],
-            "trough_timestamp": [d.trough_timestamp for d in drawdowns],
-            "end_timestamp": [d.end_timestamp for d in drawdowns],
-            "peak_equity": [float(d.peak_equity) for d in drawdowns],
-            "trough_equity": [float(d.trough_equity) for d in drawdowns],
-            "depth_pct": [float(d.depth_pct) for d in drawdowns],
-            "duration_days": [d.duration_days for d in drawdowns],
-            "recovery_days": [d.recovery_days for d in drawdowns],
-            "recovered": [d.recovered for d in drawdowns],
-            "total_days_underwater": [d.total_days_underwater for d in drawdowns],
+            "drawdown_id": d.drawdown_id,
+            "start_timestamp": d.start_timestamp.isoformat()
+            if hasattr(d.start_timestamp, "isoformat")
+            else str(d.start_timestamp),
+            "trough_timestamp": d.trough_timestamp.isoformat()
+            if hasattr(d.trough_timestamp, "isoformat")
+            else str(d.trough_timestamp),
+            "end_timestamp": d.end_timestamp.isoformat()
+            if d.end_timestamp and hasattr(d.end_timestamp, "isoformat")
+            else (str(d.end_timestamp) if d.end_timestamp else None),
+            "peak_equity": float(d.peak_equity),
+            "trough_equity": float(d.trough_equity),
+            "depth_pct": float(d.depth_pct),
+            "duration_days": d.duration_days,
+            "recovery_days": d.recovery_days,
+            "recovered": d.recovered,
+            "total_days_underwater": d.total_days_underwater,
         }
-    )
+        for d in drawdowns
+    ]
 
-    # Write with compression
-    df.to_parquet(output_path, compression="zstd", index=False)
+    # Write JSON
+    with output_path.open("w") as f:
+        json.dump(data, f, indent=2, cls=DecimalEncoder)
 
     logger.info(
         "Drawdowns written",
@@ -252,7 +268,7 @@ def write_drawdowns_parquet(drawdowns: list[DrawdownPeriod], output_path: Path) 
     )
 
 
-def write_strategy_timeline_csv(
+def write_strategy_chart_data(
     event_store: EventStore,
     strategy_id: str,
     output_path: Path,
@@ -260,16 +276,16 @@ def write_strategy_timeline_csv(
     end_time: datetime | None = None,
 ) -> None:
     """
-    Write comprehensive CSV timeline for a single strategy.
+    Write comprehensive chart data in JSON format for a single strategy.
 
-    Creates a human-friendly CSV with "tall format":
-    - One row per ticker per timestamp (OHLC data + trading events)
-    - One row per indicator per timestamp (synthetic ticker with underlying reference)
-    - One row per portfolio metric per timestamp (EQUITY, CASH, etc. as synthetic tickers)
+    Creates a browser-friendly JSON array with "tall format":
+    - One object per ticker per timestamp (OHLC data + trading events)
+    - One object per indicator per timestamp (synthetic ticker with underlying reference)
+    - One object per portfolio metric per timestamp (EQUITY, CASH, etc. as synthetic tickers)
 
     This format is:
-    - Excel/Python friendly (easy filtering: df[df.ticker == 'AAPL'])
-    - No dynamic columns (uniform schema regardless of number of indicators)
+    - Browser/JavaScript friendly (easy filtering: data.filter(d => d.ticker === 'AAPL'))
+    - No dynamic fields (uniform schema regardless of number of indicators)
     - Easy to chart (filter by ticker, plot close values over time)
 
     **Backward Adjustment:**
@@ -282,7 +298,7 @@ def write_strategy_timeline_csv(
     Args:
         event_store: EventStore to query for events
         strategy_id: Strategy identifier to filter events
-        output_path: Path to write CSV file
+        output_path: Path to write JSON file
         start_time: Optional start time filter
         end_time: Optional end time filter
 
@@ -318,10 +334,12 @@ def write_strategy_timeline_csv(
         fill_source_service: Service that created the fill (execution_service)
         trade_id: Trade ID linking entry and exit fills (NULL if position still open)
 
-    Example Rows:
-        2023-01-01 09:30,sma_cross,AAPL,AAPL,150.00,152.00,149.50,151.50,1000000,OPEN_LONG,151.50,ord_123,100,,,,
-        2023-01-01 09:30,sma_cross,SMA_fast_10,AAPL,,,,150.20,,,,,,,,,
-        2023-01-01 09:30,sma_cross,EQUITY,PORTFOLIO,,,,100000.00,,,,,,,,,
+    Example Output:
+        [
+            {"timestamp": "2023-01-01T09:30:00+00:00", "ticker": "AAPL", "open": 150.00, "close": 151.50, ...},
+            {"timestamp": "2023-01-01T09:30:00+00:00", "ticker": "SMA_fast_10", "close": 150.20, ...},
+            {"timestamp": "2023-01-01T09:30:00+00:00", "ticker": "EQUITY", "close": 100000.00, ...}
+        ]
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -686,65 +704,13 @@ def write_strategy_timeline_csv(
                 }
                 rows.append(row)
 
-    # Write CSV
+    # Write JSON
     if rows:
-        fieldnames = [
-            "timestamp",
-            "strategy_id",
-            "ticker",
-            "underlying",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            # Signal fields (Tier 1 + Tier 3)
-            "signal_intention",
-            "signal_price",
-            "signal_confidence",  # NEW: Tier 1 - Signal strength (0.0-1.0)
-            "signal_reason",  # NEW: Tier 3 - Why signal was generated
-            "signal_event_id",
-            "signal_correlation_id",
-            "signal_causation_id",
-            "signal_source_service",
-            # Order fields (Tier 1 + Tier 2 + Tier 3)
-            "order_id",
-            "order_side",  # NEW: Tier 1 - BUY/SELL
-            "order_type",  # NEW: Tier 2 - MARKET/LIMIT/STOP
-            "order_qty",
-            "order_timestamp",  # NEW: Tier 3 - Order creation time
-            "order_event_id",
-            "order_correlation_id",
-            "order_causation_id",
-            "order_source_service",
-            # Fill fields (Tier 1 + Tier 2 + Tier 3)
-            "fill_id",
-            "fill_side",  # NEW: Tier 1 - BUY/SELL
-            "fill_qty",
-            "fill_price",
-            "fill_slippage_bps",  # NEW: Tier 2 - Execution quality metric
-            "fill_timestamp",  # NEW: Tier 3 - Fill execution time
-            "commission",
-            "fill_event_id",
-            "fill_correlation_id",
-            "fill_causation_id",
-            "fill_source_service",
-            # Trade fields (Tier 2 + Tier 3)
-            "trade_id",
-            "trade_status",  # NEW: Tier 2 - OPEN/CLOSED
-            "trade_side",  # NEW: Tier 2 - LONG/SHORT
-            "trade_entry_price",  # NEW: Tier 3 - Average entry price
-            "trade_exit_price",  # NEW: Tier 3 - Average exit price
-            "trade_realized_pnl",  # NEW: Tier 2 - P&L when closed
-        ]
-
-        with output_path.open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
+        with output_path.open("w") as f:
+            json.dump(rows, f, indent=2, cls=DecimalEncoder)
 
         logger.info(
-            "strategy_timeline.written",
+            "strategy_chart_data.written",
             strategy_id=strategy_id,
             path=str(output_path),
             rows=len(rows),
@@ -752,7 +718,7 @@ def write_strategy_timeline_csv(
         )
     else:
         logger.warning(
-            "strategy_timeline.no_data",
+            "strategy_chart_data.no_data",
             strategy_id=strategy_id,
             path=str(output_path),
         )

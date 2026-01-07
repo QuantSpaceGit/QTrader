@@ -47,12 +47,12 @@ from qtrader.services.reporting.config import ReportingConfig
 from qtrader.services.reporting.formatters import display_performance_report
 from qtrader.services.reporting.writers import (
     write_backtest_metadata,
-    write_drawdowns_parquet,
-    write_equity_curve_parquet,
+    write_drawdowns_json,
+    write_equity_curve_json,
     write_json_report,
-    write_returns_parquet,
-    write_strategy_timeline_csv,
-    write_trades_parquet,
+    write_returns_json,
+    write_strategy_chart_data,
+    write_trades_json,
 )
 
 
@@ -911,7 +911,7 @@ class ReportingService:
                     )
                     equity_points.append(point)
 
-                write_equity_curve_parquet(equity_points, ts_path / "equity_curve.parquet")
+                write_equity_curve_json(equity_points, ts_path / "equity_curve.json")
 
             # Returns
             if self.config.include_returns and self._returns_calc.returns:
@@ -932,26 +932,26 @@ class ReportingService:
                     )
                     returns_points.append(ret_point)
 
-                write_returns_parquet(returns_points, ts_path / "returns.parquet")
+                write_returns_json(returns_points, ts_path / "returns.json")
 
             # Trades
             if self.config.include_trades and metrics.total_trades > 0:
-                write_trades_parquet(self._trade_stats_calc.trades, ts_path / "trades.parquet")
+                write_trades_json(self._trade_stats_calc.trades, ts_path / "trades.json")
 
             # Drawdowns
             if self.config.include_drawdowns and metrics.drawdown_periods:
-                write_drawdowns_parquet(metrics.drawdown_periods, ts_path / "drawdowns.parquet")
+                write_drawdowns_json(metrics.drawdown_periods, ts_path / "drawdowns.json")
 
-        # Write CSV timeline (one file per strategy)
+        # Write chart data JSON (one file per strategy)
         if self.config.write_csv_timeline:
             if not self._event_store:
                 self.logger.warning(
-                    "csv_timeline.skipped",
+                    "chart_data.skipped",
                     reason="EventStore not available - pass event_store to ReportingService.__init__()",
                 )
             elif not self._strategy_ids:
                 self.logger.warning(
-                    "csv_timeline.skipped",
+                    "chart_data.skipped",
                     reason="No strategy IDs found in context",
                 )
             else:
@@ -959,19 +959,19 @@ class ReportingService:
 
                 # Note: We don't pass start_time/end_time to EventStore queries because
                 # EventStore filters by occurred_at (when event was created), not by
-                # business timestamp (the market data time). The CSV writer will filter
+                # business timestamp (the market data time). The chart data writer will filter
                 # by business timestamp internally if needed.
 
-                # Export one CSV per strategy
+                # Export one JSON file per strategy (generic filename for easy loading)
                 for strategy_id in self._strategy_ids:
-                    csv_path = ts_path / f"timeline_{strategy_id}.csv"
+                    json_path = ts_path / "chart_data.json"
                     try:
-                        write_strategy_timeline_csv(
+                        write_strategy_chart_data(
                             self._event_store,
                             strategy_id,
-                            csv_path,
-                            None,  # start_time - not used, CSV writer includes all events
-                            None,  # end_time - not used, CSV writer includes all events
+                            json_path,
+                            None,  # start_time - not used, writer includes all events
+                            None,  # end_time - not used, writer includes all events
                         )
                     except Exception as e:
                         self.logger.error(
