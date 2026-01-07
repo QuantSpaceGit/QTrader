@@ -354,7 +354,7 @@ class ExperimentMetadata:
         Returns:
             Path to manifest file
         """
-        manifest_path = run_dir / "run_manifest.json"
+        manifest_path = run_dir / "manifest.json"
         with open(manifest_path, "w") as f:
             json.dump(metadata.to_dict(), f, indent=2)
         return manifest_path
@@ -370,7 +370,7 @@ class ExperimentMetadata:
         Returns:
             RunMetadata or None if not found
         """
-        manifest_path = run_dir / "run_manifest.json"
+        manifest_path = run_dir / "manifest.json"
         if not manifest_path.exists():
             return None
 

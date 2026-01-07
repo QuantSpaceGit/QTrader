@@ -156,7 +156,7 @@ def backtest_command(
             {experiment_id}.yaml           # Configuration
             runs/
                 {timestamp}/               # This run's artifacts
-                    run_manifest.json      # Metadata
+                    manifest.json          # Metadata
                     config_snapshot.yaml   # Config copy
                     events.{backend}       # Event store
                     logs/                  # If file logging enabled
@@ -327,7 +327,7 @@ def backtest_command(
 
         # Experiment artifacts
         console.print(f"[cyan]Run Directory:[/cyan]   {run_dir}")
-        console.print(f"[cyan]Metadata:[/cyan]        run_manifest.json")
+        console.print(f"[cyan]Metadata:[/cyan]        manifest.json")
 
         # Event store info
         backend_type = system_config.output.event_store.backend
